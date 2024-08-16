@@ -1,0 +1,10 @@
+{
+  "extensionDescription": {
+    "description": "Extension description",
+    "message": "A Pomodoro timer extension for developers to manage time and tasks effectively"
+  },
+  "extensionName": {
+    "description": "Extension name",
+    "message": "PomoDev"
+  }
+}
