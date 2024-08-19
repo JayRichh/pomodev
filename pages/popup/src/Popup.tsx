@@ -1,76 +1,40 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import '@src/Popup.css';
 import { useStorageSuspense, withErrorBoundary, withSuspense } from '@extension/shared';
-import { exampleThemeStorage } from '@extension/storage';
+import { exampleThemeStorage, pomodoroStorage } from '@extension/storage';
 import { ComponentPropsWithoutRef } from 'react';
 
 type Tab = 'Timer' | 'Tasks' | 'Settings';
 
-interface Task {
-  id: string;
-  text: string;
-  completed: boolean;
-}
-
-interface TimerState {
-  time: number;
-  isRunning: boolean;
-  lastUpdated: number;
-}
-
 const Popup: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('Timer');
-  const [timerState, setTimerState] = useState<TimerState>({ time: 25 * 60, isRunning: false, lastUpdated: Date.now() });
   const [isEditing, setIsEditing] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [localTime, setLocalTime] = useState<number | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
+  const pomodoroState = useStorageSuspense(pomodoroStorage);
+  const { tasks, hideCompleted } = pomodoroState;
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
 
   useEffect(() => {
-    // Load saved state when component mounts
-    chrome.storage.local.get(['timerState', 'tasks'], (result) => {
-      if (result.timerState) {
-        const savedState = result.timerState as TimerState;
-        if (savedState.isRunning) {
-          const elapsedTime = Math.floor((Date.now() - savedState.lastUpdated) / 1000);
-          const newTime = Math.max(0, savedState.time - elapsedTime);
-          setTimerState({ ...savedState, time: newTime, lastUpdated: Date.now() });
+    const syncTimer = () => {
+      chrome.runtime.sendMessage({ type: 'GET_TIME_REMAINING' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(chrome.runtime.lastError);
         } else {
-          setTimerState(savedState);
+          setLocalTime(response.timeRemaining);
+          setIsRunning(response.isRunning);
         }
-      }
-      if (result.tasks) {
-        setTasks(result.tasks as Task[]);
-      }
-    });
-  }, []);
+      });
+    };
 
-  useEffect(() => {
-    let interval: number | undefined;
-    if (timerState.isRunning && timerState.time > 0) {
-      interval = window.setInterval(() => {
-        setTimerState((prevState) => {
-          const newState = { ...prevState, time: Math.max(0, prevState.time - 1), lastUpdated: Date.now() };
-          chrome.storage.local.set({ timerState: newState });
-          return newState;
-        });
-      }, 1000);
-    } else if (timerState.time === 0) {
-      setTimerState((prevState) => ({ ...prevState, isRunning: false }));
-    }
+    syncTimer();
+    const interval = setInterval(syncTimer, 1000);
+
     return () => clearInterval(interval);
-  }, [timerState.isRunning, timerState.time]);
-
-  useEffect(() => {
-    // Save timer state whenever it changes
-    chrome.storage.local.set({ timerState });
-  }, [timerState]);
-
-  useEffect(() => {
-    // Save tasks whenever they change
-    chrome.storage.local.set({ tasks });
-  }, [tasks]);
+  }, []);
 
   const formatTime = useCallback((seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -78,31 +42,32 @@ const Popup: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const toggleTimer = () => {
-    setTimerState((prevState) => ({ ...prevState, isRunning: !prevState.isRunning, lastUpdated: Date.now() }));
-  };
-  
-  const resetTimer = () => {
-    setTimerState({ time: 25 * 60, isRunning: false, lastUpdated: Date.now() });
-  };
-
   const handleTimeEdit = (e: React.FocusEvent<HTMLInputElement>) => {
     const [minutes, seconds] = e.target.value.split(':').map(Number);
     if (!isNaN(minutes) && !isNaN(seconds)) {
-      setTimerState((prevState) => ({ ...prevState, time: minutes * 60 + seconds, lastUpdated: Date.now() }));
+      const newTime = minutes * 60 + seconds;
+      pomodoroStorage.setTime(newTime);
+      setLocalTime(newTime);
     }
     setIsEditing(false);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+  const handleToggleTimer = () => {
+    pomodoroStorage.toggleTimer().then(() => {
+      setIsRunning(!isRunning);
+      chrome.runtime.sendMessage({ type: isRunning ? 'STOP_TIMER' : 'START_TIMER' });
+    });
   };
 
-  const addTask = (text: string) => {
-    setTasks([...tasks, { id: Date.now().toString(), text, completed: false }]);
+  const handleResetTimer = () => {
+    pomodoroStorage.resetTimer().then(() => {
+      setLocalTime(25 * 60);
+      setIsRunning(false);
+      chrome.runtime.sendMessage({ type: 'STOP_TIMER' });
+    });
   };
+
+  const filteredTasks = hideCompleted ? tasks.filter(task => !task.completed) : tasks;
 
   return (
     <div className={`w-full h-full flex flex-col ${isLight ? 'bg-white text-gray-900' : 'bg-gray-900 text-gray-100'}`}>
@@ -128,7 +93,7 @@ const Popup: React.FC = () => {
             {isEditing ? (
               <input
                 type="text"
-                defaultValue={formatTime(timerState.time)}
+                defaultValue={formatTime(localTime ?? 25 * 60)}
                 onBlur={handleTimeEdit}
                 className={`text-6xl font-bold mb-8 w-full max-w-xs text-center bg-transparent border-b-2 ${
                   isLight ? 'border-gray-300 focus:border-blue-500' : 'border-gray-700 focus:border-blue-400'
@@ -140,28 +105,28 @@ const Popup: React.FC = () => {
                 className="text-6xl font-bold mb-8 cursor-pointer hover:text-blue-500 transition-colors duration-300"
                 onClick={() => setIsEditing(true)}
               >
-                {formatTime(timerState.time)}
+                {formatTime(localTime ?? 25 * 60)}
               </h2>
             )}
             <div className="flex justify-center space-x-4">
               <button
                 className={`
                   font-bold py-3 px-6 rounded-md shadow hover:shadow-lg transition-all duration-300
-                  ${timerState.isRunning
+                  ${isRunning
                     ? (isLight ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-700 text-white hover:bg-red-800')
                     : (isLight ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-green-700 text-white hover:bg-green-800')
                   }
                 `}
-                onClick={toggleTimer}
+                onClick={handleToggleTimer}
               >
-                {timerState.isRunning ? 'Pause' : 'Start'}
+                {isRunning ? 'Pause' : 'Start'}
               </button>
               <button
                 className={`
                   font-bold py-3 px-6 rounded-md shadow hover:shadow-lg transition-all duration-300
                   ${isLight ? 'bg-gray-300 text-black hover:bg-gray-400' : 'bg-gray-700 text-white hover:bg-gray-600'}
                 `}
-                onClick={resetTimer}
+                onClick={handleResetTimer}
               >
                 Reset
               </button>
@@ -169,19 +134,53 @@ const Popup: React.FC = () => {
           </div>
         )}
 
+
         {activeTab === 'Tasks' && (
           <div className="flex-grow flex flex-col">
             <h2 className="text-2xl font-bold mb-4">Tasks</h2>
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={hideCompleted}
+                  onChange={() => pomodoroStorage.toggleHideCompleted()}
+                  className="mr-2 form-checkbox h-5 w-5 text-blue-500"
+                />
+                Hide completed tasks
+              </label>
+            </div>
             <ul className="space-y-2 mb-4 flex-grow overflow-y-auto">
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <li key={task.id} className="flex items-center p-2 bg-opacity-50 rounded-md">
                   <input
                     type="checkbox"
                     checked={task.completed}
-                    onChange={() => toggleTask(task.id)}
+                    onChange={() => pomodoroStorage.toggleTask(task.id)}
                     className="mr-2 form-checkbox h-5 w-5 text-blue-500 transition duration-150 ease-in-out"
                   />
-                  <span className={`${task.completed ? 'line-through text-gray-500' : ''}`}>{task.text}</span>
+                  {editingTaskId === task.id ? (
+                    <input
+                      type="text"
+                      value={task.text}
+                      onChange={(e) => pomodoroStorage.updateTask(task.id, e.target.value)}
+                      onBlur={() => setEditingTaskId(null)}
+                      className="flex-grow p-1 rounded"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className={`flex-grow ${task.completed ? 'line-through text-gray-500' : ''}`}
+                      onDoubleClick={() => setEditingTaskId(task.id)}
+                    >
+                      {task.text}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => pomodoroStorage.deleteTask(task.id)}
+                    className="ml-2 text-red-500 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
                 </li>
               ))}
             </ul>
@@ -189,7 +188,7 @@ const Popup: React.FC = () => {
               e.preventDefault();
               const input = e.currentTarget.elements.namedItem('newTask') as HTMLInputElement;
               if (input.value.trim()) {
-                addTask(input.value.trim());
+                pomodoroStorage.addTask(input.value.trim());
                 input.value = '';
               }
             }} className="flex mt-auto">
