@@ -49,8 +49,9 @@ type PomodoroStorage = BaseStorage<PomodoroState> & {
   deleteBreakInterval: (id: string) => Promise<void>;
   addToTimerQueue: (timerState: TimerState) => Promise<void>;
   removeFromTimerQueue: (index: number) => Promise<void>;
-  setSettings: (settings: Partial<PomodoroState['settings']>) => Promise<void>;
-  getSettings: () => Promise<PomodoroState['settings']>;
+  setSettings: (settings: Partial<Settings>) => Promise<void>;
+  getSettings: () => Promise<Settings>;
+  updateTimerStateBasedOnSettings: () => Promise<void>;
 };
 
 const initialState: PomodoroState = {
@@ -207,14 +208,39 @@ export const pomodoroStorage: PomodoroStorage = {
       timerQueue: currentState.timerQueue.filter((_, i) => i !== index),
     }));
   },
-  setSettings: async (settings: Partial<PomodoroState['settings']>) => {
+  setSettings: async (settings: Partial<Settings>) => {
     await storage.set((currentState) => ({
       ...currentState,
       settings: { ...currentState.settings, ...settings },
     }));
   },
+
   getSettings: async () => {
     const currentState = await storage.get();
     return currentState.settings;
+  },
+
+  updateTimerStateBasedOnSettings: async () => {
+    const currentState = await storage.get();
+    const { settings, timerState } = currentState;
+
+    let newTime = timerState.time;
+    if (timerState.type === 'work' && timerState.time === currentState.settings.pomodoroDuration * 60) {
+      newTime = settings.pomodoroDuration * 60;
+    } else if (timerState.type === 'break') {
+      const isLongBreak = currentState.breakIntervals.findIndex(interval => interval.duration === timerState.time) === -1;
+      if (isLongBreak && timerState.time === currentState.settings.longBreakDuration * 60) {
+        newTime = settings.longBreakDuration * 60;
+      } else if (!isLongBreak && timerState.time === currentState.settings.shortBreakDuration * 60) {
+        newTime = settings.shortBreakDuration * 60;
+      }
+    }
+
+    if (newTime !== timerState.time) {
+      await storage.set((state) => ({
+        ...state,
+        timerState: { ...state.timerState, time: newTime },
+      }));
+    }
   },
 };

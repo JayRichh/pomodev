@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { usePomodoroStorage } from '@extension/shared';
 import { pomodoroStorage, exampleThemeStorage } from '@extension/storage';
 import '@src/Popup.css';
@@ -9,9 +9,16 @@ const TimerTab: React.FC = () => {
   const [newWorkDuration, setNewWorkDuration] = useState<number>(25);
 
   const pomodoroState = usePomodoroStorage();
-  const { breakIntervals, timerQueue, timerState } = pomodoroState || {};
+  const { breakIntervals, timerQueue, timerState, settings } = pomodoroState || {};
   const theme = exampleThemeStorage.getSnapshot();
   const isLight = theme === 'light';
+
+  useEffect(() => {
+    if (settings) {
+      setNewWorkDuration(settings.pomodoroDuration);
+      setNewBreakDuration(settings.shortBreakDuration);
+    }
+  }, [settings]);
 
   const formatTime = useCallback((seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -58,12 +65,22 @@ const TimerTab: React.FC = () => {
     });
   };
 
-  if (!timerState || !timerQueue) {
+  const handleWorkDurationChange = (value: number) => {
+    setNewWorkDuration(value);
+    pomodoroStorage.setSettings({ pomodoroDuration: value });
+  };
+
+  const handleBreakDurationChange = (value: number) => {
+    setNewBreakDuration(value);
+    pomodoroStorage.setSettings({ shortBreakDuration: value });
+  };
+
+  if (!timerState || !timerQueue || !settings) {
     return null; // or some loading state
   }
 
   const currentTimer = timerQueue[0] || timerState;
-  const totalTime = currentTimer.type === 'work' ? 25 * 60 : breakIntervals?.[0]?.duration || 5 * 60;
+  const totalTime = currentTimer.type === 'work' ? settings.pomodoroDuration * 60 : settings.shortBreakDuration * 60;
   const progress = ((totalTime - currentTimer.time) / totalTime) * 100;
 
   const totalQueueTime = timerQueue.reduce((acc: number, timer: { time: number }) => acc + timer.time, 0);
@@ -105,7 +122,7 @@ const TimerTab: React.FC = () => {
               ? 'bg-green-500'
               : 'bg-orange-500'
           }`}
-          style={{ width: `${((totalTime - timerState.time) / totalTime) * 100}%` }}
+          style={{ width: `${progress}%` }}
         ></div>
       </div>
 
@@ -148,7 +165,7 @@ const TimerTab: React.FC = () => {
           <input
             type="number"
             value={newWorkDuration}
-            onChange={(e) => setNewWorkDuration(Number(e.target.value))}
+            onChange={(e) => handleWorkDurationChange(Number(e.target.value))}
             className="w-12 p-1 rounded text-black dark:text-white dark:bg-gray-600 text-center"
             min="1"
           />
@@ -158,7 +175,7 @@ const TimerTab: React.FC = () => {
           <input
             type="number"
             value={newBreakDuration}
-            onChange={(e) => setNewBreakDuration(Number(e.target.value))}
+            onChange={(e) => handleBreakDurationChange(Number(e.target.value))}
             className="w-12 p-1 rounded text-black dark:text-white dark:bg-gray-600 text-center"
             min="1"
           />

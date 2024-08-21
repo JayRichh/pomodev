@@ -107,14 +107,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     logMessage('info', 'Timer reset via message');
   } else if (message.type === 'UPDATE_SETTINGS') {
-    pomodoroStorage.setSettings(message.settings);
-    sendResponse({ success: true });
-    logMessage('info', 'Settings updated via message', { settings: message.settings });
+    pomodoroStorage.setSettings(message.settings).then(() => {
+      sendResponse({ success: true });
+      logMessage('info', 'Settings updated via message', { settings: message.settings });
+    });
+    
   }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   logMessage('info', 'Pomodoro extension installed or updated');
+});
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes['pomodoro-storage-key']) {
+    const newValue = changes['pomodoro-storage-key'].newValue;
+    if (newValue && newValue.settings) {
+      pomodoroStorage.updateTimerStateBasedOnSettings().then(() => {
+        logMessage('info', 'Timer state updated based on new settings');
+      });
+    }
+  }
 });
 
 chrome.runtime.onStartup.addListener(async () => {
