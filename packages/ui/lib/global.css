@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --logo-stroke-start: #000000;
+    --logo-stroke-middle: #404040;
+    --logo-stroke-end: #808080;
+    --logo-fill-start: #e0e0e0;
+    --logo-fill-middle: #c0c0c0;
+    --logo-fill-end: #a0a0a0;
+  }
+  
+  .dark {
+    --logo-stroke-start: #FFFFFF;
+    --logo-stroke-middle: #DDDDDD;
+    --logo-stroke-end: #BBBBBB;
+    --logo-fill-start: #000000;
+    --logo-fill-middle: #333333;
+    --logo-fill-end: #555555;
+  }
+  
+  /* Ensure orange remains the same */
+  .orange {
+    --logo-color: #ff6b35;
+  }

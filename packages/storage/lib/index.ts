@@ -2,4 +2,4 @@ import { createStorage, StorageType, type BaseStorage, SessionAccessLevel } from
 import { exampleThemeStorage } from './exampleThemeStorage';
 import { pomodoroStorage } from './pomodoroStorage';
 
-export { exampleThemeStorage,pomodoroStorage, createStorage, StorageType, SessionAccessLevel, BaseStorage };
+export { exampleThemeStorage, pomodoroStorage, createStorage, StorageType, SessionAccessLevel, BaseStorage };

@@ -6,7 +6,7 @@ import { Button } from '@extension/ui';
 const Options = () => {
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
-  const logo = isLight ? 'options/logo_horizontal.svg' : 'options/logo_horizontal_dark.svg';
+  const logo = isLight ? 'options/pomodev-logo.svg' : 'options/pomodev-logo.svg';
 
   return (
     <div className={`App-container ${isLight ? 'text-gray-900 bg-slate-50' : 'text-gray-100 bg-gray-800'}`}>

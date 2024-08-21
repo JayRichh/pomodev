@@ -7,7 +7,7 @@ import { Button } from '@extension/ui';
 const NewTab = () => {
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
-  const logo = isLight ? 'new-tab/logo_horizontal.svg' : 'new-tab/logo_horizontal_dark.svg';
+  const logo = isLight ? 'new-tab/pomodev-logo.svg' : 'new-tab/pomodev-logo.svg';
 
   return (
     <div className={`App ${isLight ? 'bg-slate-50' : 'bg-gray-800'}`}>

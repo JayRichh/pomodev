@@ -1,85 +1,137 @@
 import 'webextension-polyfill';
-import { exampleThemeStorage, pomodoroStorage } from '@extension/storage';
+import { pomodoroStorage } from '@extension/storage';
 
 let timerInterval: number | undefined;
 
-exampleThemeStorage.get().then(theme => {
-  console.log('theme', theme);
-});
+function logMessage(level: 'info' | 'warn' | 'error', message: string, context: object = {}) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, context);
+}
 
-const svgIcon = `data:image/svg+xml,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-    <circle cx="32" cy="32" r="28" stroke="#4A5568" stroke-width="4"/>
-    <path d="M32 16V32L42 42" stroke="#4A5568" stroke-width="4" stroke-linecap="round"/>
-  </svg>
-  `)}`;
-  
-  function updateTimer() {
+async function updateTimer() {
+  const state = await pomodoroStorage.get();
+  const settings = await pomodoroStorage.getSettings();
+  if (state.timerState.isRunning) {
+    const now = Date.now();
+    const elapsed = Math.floor((now - state.timerState.lastUpdated) / 1000);
+    const newTime = Math.max(0, state.timerState.time - elapsed);
     
-    pomodoroStorage.get().then((state) => {
-      if (state.timerState.isRunning) {
-        const now = Date.now();
-        const elapsed = Math.floor((now - state.timerState.lastUpdated) / 1000);
-        const newTime = Math.max(0, state.timerState.time - elapsed);
-        
-        if (newTime !== state.timerState.time) {
-          pomodoroStorage.setTime(newTime);
-        }
-        
-        if (newTime === 0) {
-          pomodoroStorage.toggleTimer();
-          chrome.notifications.create({
-            type: 'basic',
-            iconUrl: chrome.runtime.getURL("icon-34.png"),
-            title: 'Pomodoro Timer',
-            message: 'Time is up! Take a break.',
-          });
-        }
-      }
-    });
-  }
-  
-function startTimer() {
-  if (!timerInterval) {
-    if (typeof self !== 'undefined' && self.setInterval) {
-      timerInterval = self.setInterval(updateTimer, 1000) as unknown as number;
-    } else if (typeof global !== 'undefined' && global.setInterval) {
-      timerInterval = global.setInterval(updateTimer, 1000) as unknown as number;
+    if (newTime !== state.timerState.time) {
+      await pomodoroStorage.setTime(newTime);
+    }
+    
+    if (newTime === 0) {
+      await pomodoroStorage.stopTimer();
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL("pomodev-logo-128.png"),
+        title: 'Pomodoro Timer',
+        message: `${state.timerState.type === 'work' ? 'Work' : 'Break'} session completed!`,
+      });
+      await startNextSession();
     }
   }
 }
 
+async function startNextSession() {
+  const state = await pomodoroStorage.get();
+  const settings = await pomodoroStorage.getSettings();
+  if (state.timerQueue.length > 0) {
+    const nextSession = state.timerQueue[0];
+    await pomodoroStorage.set((currentState) => ({
+      ...currentState,
+      timerState: {
+        ...nextSession,
+        isRunning: true,
+        lastUpdated: Date.now(),
+      },
+      timerQueue: currentState.timerQueue.slice(1),
+    }));
+    logMessage('info', 'Starting next session from timerQueue', { nextSession });
+    startTimer();
+  } else if (state.timerState.type === 'work') {
+    const nextBreak = state.breakIntervals[0];
+    if (nextBreak) {
+      await pomodoroStorage.set((currentState) => ({
+        ...currentState,
+        timerState: {
+          time: nextBreak.duration,
+          isRunning: true,
+          lastUpdated: Date.now(),
+          type: 'break',
+        },
+      }));
+      logMessage('info', 'Starting next break', { nextBreak });
+      startTimer();
+    }
+  } else {
+    await pomodoroStorage.set((currentState) => ({
+      ...currentState,
+      timerState: {
+        time: settings.pomodoroDuration * 60,
+        isRunning: true,
+        lastUpdated: Date.now(),
+        type: 'work',
+      },
+    }));
+    logMessage('info', 'Starting new work session');
+    startTimer();
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  timerInterval = setInterval(updateTimer, 1000) as unknown as number;
+  logMessage('info', 'Timer started');
+}
+
 function stopTimer() {
   if (timerInterval) {
-    if (typeof self !== 'undefined' && self.clearInterval) {
-      self.clearInterval(timerInterval);
-    } else if (typeof global !== 'undefined' && global.clearInterval) {
-      global.clearInterval(timerInterval);
-    }
+    clearInterval(timerInterval);
     timerInterval = undefined;
+    logMessage('info', 'Timer stopped');
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_TIMER') {
     startTimer();
+    sendResponse({ success: true });
+    logMessage('info', 'Timer started via message');
   } else if (message.type === 'STOP_TIMER') {
     stopTimer();
-  } else if (message.type === 'GET_TIME_REMAINING') {
-    pomodoroStorage.get().then((state) => {
-      sendResponse({ timeRemaining: state.timerState.time, isRunning: state.timerState.isRunning });
-    });
-    return true; // Indicates that the response is asynchronous
+    sendResponse({ success: true });
+    logMessage('info', 'Timer stopped via message');
+  } else if (message.type === 'RESET_TIMER') {
+    stopTimer();
+    sendResponse({ success: true });
+    logMessage('info', 'Timer reset via message');
+  } else if (message.type === 'UPDATE_SETTINGS') {
+    pomodoroStorage.setSettings(message.settings);
+    sendResponse({ success: true });
+    logMessage('info', 'Settings updated via message', { settings: message.settings });
   }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  startTimer(); // Start the timer when the extension is installed or updated
+  logMessage('info', 'Pomodoro extension installed or updated');
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  const state = await pomodoroStorage.get();
+  const settings = await pomodoroStorage.getSettings();
+  if (state.timerState.isRunning) {
+    startTimer();
+    logMessage('info', 'Pomodoro timer resumed after browser startup');
+  } else {
+    logMessage('info', 'Pomodoro timer not started as it was paused/stopped before');
+  }
+  logMessage('info', 'Current settings', { settings });
 });
 
 chrome.runtime.onSuspend.addListener(() => {
   stopTimer();
+  logMessage('info', 'Pomodoro timer suspended due to browser shutdown');
 });
 
-console.log('background loaded');
-console.log("Edit 'chrome-extension/lib/background/index.ts' and save to reload.");
+logMessage('info', 'Background script loaded');

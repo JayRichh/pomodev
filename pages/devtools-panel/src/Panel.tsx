@@ -1,12 +1,22 @@
 import '@src/Panel.css';
 import { useStorageSuspense, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { ComponentPropsWithoutRef } from 'react';
+import { ComponentPropsWithoutRef, useEffect } from 'react';
 
 const Panel = () => {
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
-  const logo = isLight ? 'devtools-panel/logo_horizontal.svg' : 'devtools-panel/logo_horizontal_dark.svg';
+
+  // Add useEffect to toggle dark mode class on the root HTML element
+  useEffect(() => {
+    if (isLight) {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  }, [isLight]);
+
+  const logo = 'devtools-panel/pomodev-logo.svg'; // No need for ternary as both paths are the same
 
   return (
     <div className={`App ${isLight ? 'bg-slate-50' : 'bg-gray-800'}`}>
