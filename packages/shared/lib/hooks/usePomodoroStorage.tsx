@@ -1,18 +1,46 @@
 import { useEffect, useState } from 'react';
 import { pomodoroStorage } from '@extension/storage';
+import type { PomodoroState, TimerState, Task, BreakInterval, Settings } from '../../../storage/lib/pomodoroStorage';
 
-export function usePomodoroStorage(): ReturnType<typeof pomodoroStorage.getSnapshot> {
-  const [state, setState] = useState(pomodoroStorage.getSnapshot());
+type PomodoroStorageHook = PomodoroState & Omit<typeof pomodoroStorage, keyof PomodoroState>;
+
+export function usePomodoroStorage(): PomodoroStorageHook {
+  const [state, setState] = useState<PomodoroState>(() => {
+    const snapshot = pomodoroStorage.getSnapshot();
+    return snapshot !== null ? snapshot : getInitialState();
+  });
 
   useEffect(() => {
     const unsubscribe = pomodoroStorage.subscribe(() => {
-      setState(pomodoroStorage.getSnapshot());
+      const newState = pomodoroStorage.getSnapshot();
+      if (newState !== null) {
+        setState(newState);
+      }
     });
 
     return unsubscribe;
   }, []);
 
-  return state;
+  return {
+    ...state,
+    ...pomodoroStorage,
+  };
 }
 
-export type PomodoroState = ReturnType<typeof usePomodoroStorage>;
+function getInitialState(): PomodoroState {
+  return {
+    timerState: { time: 25 * 60, isRunning: false, lastUpdated: Date.now(), type: 'work' },
+    tasks: [],
+    hideCompleted: false,
+    breakIntervals: [{ id: '1', duration: 5 * 60 }],
+    timerQueue: [],
+    settings: {
+      pomodoroDuration: 25,
+      shortBreakDuration: 5,
+      longBreakDuration: 15,
+      longBreakInterval: 4,
+    },
+  };
+}
+
+export type { PomodoroState, TimerState, Task, BreakInterval, Settings };

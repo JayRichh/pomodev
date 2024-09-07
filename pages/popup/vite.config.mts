@@ -10,8 +10,17 @@ export default withPageConfig({
       '@src': srcDir,
     },
   },
+  css: {
+    postcss: './postcss.config.js',
+  },
+  plugins: [],
   publicDir: resolve(rootDir, 'public'),
   build: {
     outDir: resolve(rootDir, '..', '..', 'dist', 'popup'),
+    rollupOptions: {
+      input: {
+        main: resolve(rootDir, 'index.html'),
+      },
+    },
   },
 });

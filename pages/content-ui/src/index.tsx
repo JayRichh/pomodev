@@ -7,7 +7,7 @@ import tailwindcssOutput from '@src/tailwind-output.css?inline';
 const root = document.createElement('div');
 root.id = 'pomodev-content-view-root';
 
-document.body.append(root);
+// document.body.append(root);
 
 const rootIntoShadow = document.createElement('div');
 rootIntoShadow.id = 'shadow-root';
