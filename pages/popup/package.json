@@ -1,6 +1,6 @@
 {
   "name": "@extension/popup",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "chrome extension popup",
   "private": true,
   "sideEffects": true,
@@ -21,12 +21,15 @@
     "@extension/content-runtime-script": "workspace:*",
     "@extension/shared": "workspace:*",
     "@extension/storage": "workspace:*",
-    "nodejs": "^0.0.0"
+    "nodejs": "^0.0.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-icons": "^5.3.0"
   },
   "devDependencies": {
     "@extension/tailwindcss-config": "workspace:*",
     "@extension/tsconfig": "workspace:*",
     "@extension/vite-config": "workspace:*",
-    "@types/node": "^20.14.10"
+    "@types/node": "^20.14.10",
+    "@types/react-beautiful-dnd": "^13.1.8"
   }
 }

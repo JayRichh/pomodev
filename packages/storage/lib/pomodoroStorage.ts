@@ -6,11 +6,12 @@ export interface TimerState {
   lastUpdated: number;
   type: 'work' | 'break';
 }
-
 export interface Task {
   id: string;
   text: string;
   completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  children: Task[];
 }
 
 export interface BreakInterval {
@@ -32,6 +33,9 @@ export interface PomodoroState {
   breakIntervals: BreakInterval[];
   timerQueue: TimerState[];
   settings: Settings;
+  allTasksCollapsed: boolean; // Add this line
+  activeTab: 'timer' | 'tasks' | 'settings';
+  setTasks: (tasks: Task[]) => Promise<void>;
 }
 
 type PomodoroStorage = BaseStorage<PomodoroState> & {
@@ -43,6 +47,12 @@ type PomodoroStorage = BaseStorage<PomodoroState> & {
   toggleTask: (id: string) => Promise<void>;
   updateTask: (id: string, text: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  setTasks: (tasks: Task[]) => Promise<void>;
+  addChildTask: (parentId: string, text: string) => Promise<void>;
+  updateTaskPriority: (id: string, priority: Task['priority']) => Promise<void>;
+  deleteAllTasks: () => Promise<void>;
+  toggleCollapseAll: () => Promise<void>;
+  setActiveTab: (tab: 'timer' | 'tasks' | 'settings') => Promise<void>;
   toggleHideCompleted: () => Promise<void>;
   addBreakInterval: (duration: number) => Promise<void>;
   updateBreakInterval: (id: string, duration: number) => Promise<void>;
@@ -55,6 +65,8 @@ type PomodoroStorage = BaseStorage<PomodoroState> & {
   createAlarm: (name: string, alarmInfo: chrome.alarms.AlarmCreateInfo) => Promise<void>;
   clearAlarm: (name: string) => Promise<boolean>;
   getAlarm: (name: string) => Promise<chrome.alarms.Alarm | undefined>;
+  skipToBreak: () => Promise<void>;
+  skipToWork: () => Promise<void>;
 };
 
 const initialState: PomodoroState = {
@@ -63,11 +75,18 @@ const initialState: PomodoroState = {
   hideCompleted: false,
   breakIntervals: [{ id: '1', duration: 5 * 60 }],
   timerQueue: [],
+  activeTab: 'timer',
   settings: {
     pomodoroDuration: 25,
     shortBreakDuration: 5,
     longBreakDuration: 15,
     longBreakInterval: 4,
+  },
+  allTasksCollapsed: false,
+  setTasks: async tasks => {
+    const currentState = await storage.get();
+    const newState = { ...currentState, tasks };
+    await storage.set(newState);
   },
 };
 
@@ -78,6 +97,12 @@ const storage = createStorage<PomodoroState>('pomodoro-storage-key', initialStat
 
 export const pomodoroStorage: PomodoroStorage = {
   ...storage,
+
+  setActiveTab: async tab => {
+    const currentState = await storage.get();
+    const newState = { ...currentState, activeTab: tab };
+    await storage.set(newState);
+  },
 
   toggleTimer: async () => {
     const currentState = await storage.get();
@@ -125,6 +150,62 @@ export const pomodoroStorage: PomodoroStorage = {
     });
   },
 
+  skipToBreak: async () => {
+    const currentState = await storage.get();
+    if (currentState.timerState.type !== 'work' || currentState.timerQueue.length === 0) {
+      return; // Can't skip if not in work or no breaks in queue
+    }
+
+    const nextBreak = currentState.timerQueue.find(timer => timer.type === 'break');
+    if (!nextBreak) {
+      return; // No break found in queue
+    }
+
+    await storage.set(state => ({
+      ...state,
+      timerState: {
+        ...nextBreak,
+        isRunning: state.timerState.isRunning,
+        lastUpdated: Date.now(),
+      },
+      timerQueue: state.timerQueue.filter(timer => timer !== nextBreak),
+    }));
+
+    if (currentState.timerState.isRunning) {
+      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextBreak.time / 60 });
+    }
+
+    chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextBreak });
+  },
+
+  skipToWork: async () => {
+    const currentState = await storage.get();
+    if (currentState.timerState.type !== 'break' || currentState.timerQueue.length === 0) {
+      return; // Can't skip if not in break or no work in queue
+    }
+
+    const nextWork = currentState.timerQueue.find(timer => timer.type === 'work');
+    if (!nextWork) {
+      return; // No work found in queue
+    }
+
+    await storage.set(state => ({
+      ...state,
+      timerState: {
+        ...nextWork,
+        isRunning: state.timerState.isRunning,
+        lastUpdated: Date.now(),
+      },
+      timerQueue: state.timerQueue.filter(timer => timer !== nextWork),
+    }));
+
+    if (currentState.timerState.isRunning) {
+      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextWork.time / 60 });
+    }
+
+    chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextWork });
+  },
+
   stopTimer: async () => {
     await storage.set(currentState => ({
       ...currentState,
@@ -167,16 +248,90 @@ export const pomodoroStorage: PomodoroStorage = {
     chrome.runtime.sendMessage({ type: 'TIME_UPDATED', time });
   },
 
+  addChildTask: async (parentId: string, text: string) => {
+    await storage.set(currentState => {
+      // Recursive function to find the task and add the child
+      const addChildToTask = (tasks: Task[]): Task[] => {
+        return tasks.map(task => {
+          if (task.id === parentId) {
+            // Add the new child task to the parent task
+            return {
+              ...task,
+              children: [
+                ...task.children,
+                { id: Date.now().toString(), text, completed: false, priority: 'medium', children: [] },
+              ],
+            };
+          } else if (task.children.length > 0) {
+            // Recursively search for the parent task in child tasks
+            return { ...task, children: addChildToTask(task.children) };
+          }
+          return task;
+        });
+      };
+
+      // Return the updated state with the modified tasks
+      return { ...currentState, tasks: addChildToTask(currentState.tasks) };
+    });
+  },
+  updateTaskPriority: async (id: string, priority: Task['priority']) => {
+    await storage.set(currentState => {
+      const updatePriority = (tasks: Task[]): Task[] => {
+        return tasks.map(task => {
+          if (task.id === id) {
+            return { ...task, priority };
+          } else if (task.children.length > 0) {
+            return { ...task, children: updatePriority(task.children) };
+          }
+          return task;
+        });
+      };
+      return { ...currentState, tasks: updatePriority(currentState.tasks) };
+    });
+  },
+
+  deleteAllTasks: async () => {
+    await storage.set(currentState => ({ ...currentState, tasks: [] }));
+  },
+
+  toggleCollapseAll: async () => {
+    await storage.set(currentState => ({ ...currentState, allTasksCollapsed: !currentState.allTasksCollapsed }));
+  },
+
+  setTasks: async (tasks: Task[]) => {
+    await storage.set(currentState => ({
+      ...currentState,
+      tasks,
+    }));
+  },
+
   addTask: async (text: string) => {
     await storage.set(currentState => ({
       ...currentState,
-      tasks: [...currentState.tasks, { id: Date.now().toString(), text, completed: false }],
+      tasks: [
+        ...currentState.tasks,
+        { id: Date.now().toString(), text, completed: false, priority: 'medium', children: [] },
+      ],
     }));
   },
   toggleTask: async (id: string) => {
+    const toggleTaskCompletion = (tasks: Task[]): Task[] => {
+      return tasks.map(task => {
+        if (task.id === id) {
+          // Toggle the completion of the task
+          return { ...task, completed: !task.completed };
+        }
+        // If the task has children, recursively apply the toggle function
+        if (task.children && task.children.length > 0) {
+          return { ...task, children: toggleTaskCompletion(task.children) };
+        }
+        return task;
+      });
+    };
+
     await storage.set(currentState => ({
       ...currentState,
-      tasks: currentState.tasks.map(task => (task.id === id ? { ...task, completed: !task.completed } : task)),
+      tasks: toggleTaskCompletion(currentState.tasks),
     }));
   },
   updateTask: async (id: string, text: string) => {

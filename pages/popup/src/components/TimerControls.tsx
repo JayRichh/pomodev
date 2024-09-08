@@ -1,9 +1,7 @@
 import React from 'react';
-import { NumberSetting } from './SettingsTab';
 
 interface TimerControlsProps {
   isRunning: boolean;
-  isLight: boolean;
   onToggleTimer: () => void;
   onStopTimer: () => void;
   onResetTimer: () => void;
@@ -13,11 +11,15 @@ interface TimerControlsProps {
   onBreakDurationChange: (value: number) => void;
   onAddWork: () => void;
   onAddBreak: () => void;
+  onSkipToBreak: () => void;
+  onSkipToWork: () => void;
+  isWorkActive: boolean;
+  hasNextWork: boolean;
+  hasNextBreak: boolean;
 }
 
 const TimerControls: React.FC<TimerControlsProps> = ({
   isRunning,
-  isLight,
   onToggleTimer,
   onStopTimer,
   onResetTimer,
@@ -27,62 +29,79 @@ const TimerControls: React.FC<TimerControlsProps> = ({
   onBreakDurationChange,
   onAddWork,
   onAddBreak,
+  onSkipToBreak,
+  onSkipToWork,
+  isWorkActive,
+  hasNextWork,
+  hasNextBreak,
 }) => {
   return (
-    <>
-      <div className="flex justify-center space-x-2 mb-4">
+    <div className="flex flex-col">
+      <div className="flex justify-between">
         <button
-          className={`flex-1 py-2 px-4 rounded-md shadow hover:shadow-lg transition-all duration-300 text-sm font-medium
-            ${
-              isRunning
-                ? isLight
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-red-700 text-white hover:bg-red-800'
-                : isLight
-                  ? 'bg-green-500 text-white hover:bg-green-600'
-                  : 'bg-green-700 text-white hover:bg-green-800'
-            }`}
+          className={`flex-1 py-2 ${isRunning ? 'bg-red-500' : 'bg-green-500'} text-white font-medium`}
           onClick={onToggleTimer}>
           {isRunning ? 'Pause' : 'Start'}
         </button>
-        <button
-          className={`flex-1 py-2 px-4 rounded-md shadow hover:shadow-lg transition-all duration-300 text-sm font-medium
-            ${isLight ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'bg-yellow-700 text-white hover:bg-yellow-800'}`}
-          onClick={onStopTimer}>
+        <button className="flex-1 py-2 bg-yellow-500 text-white font-medium" onClick={onStopTimer}>
           Stop
         </button>
-        <button
-          className={`flex-1 py-2 px-4 rounded-md shadow hover:shadow-lg transition-all duration-300 text-sm font-medium
-            ${isLight ? 'bg-gray-300 text-black hover:bg-gray-400' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
-          onClick={onResetTimer}>
+        <button className="flex-1 py-2 bg-gray-300 text-gray-800 font-medium" onClick={onResetTimer}>
           Reset
         </button>
       </div>
 
-      <div className="flex justify-between items-center mb-2 text-sm dark:text-gray-300">
-        <div className="flex items-center space-x-2">
-          <NumberSetting value={workDuration} onChange={onWorkDurationChange} isLight={isLight} />
-          <span>min work</span>
+      <div className="flex justify-between mt-2">
+        <div className="flex items-center">
+          <input
+            type="number"
+            value={workDuration}
+            onChange={e => onWorkDurationChange(Number(e.target.value))}
+            className="w-12 p-1 border text-center"
+            min="1"
+          />
+          <span className="ml-1 text-sm">min work</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <NumberSetting value={breakDuration} onChange={onBreakDurationChange} isLight={isLight} />
-          <span>min break</span>
+        <div className="flex items-center">
+          <input
+            type="number"
+            value={breakDuration}
+            onChange={e => onBreakDurationChange(Number(e.target.value))}
+            className="w-12 p-1 border text-center"
+            min="1"
+          />
+          <span className="ml-1 text-sm">min break</span>
         </div>
       </div>
 
-      <div className="flex space-x-2 mb-4">
-        <button
-          onClick={onAddWork}
-          className="flex-1 bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors duration-300 text-sm font-medium">
+      <div className="flex justify-between mt-2">
+        <button onClick={onAddWork} className="flex-1 py-2 bg-blue-500 text-white font-medium">
           Add Work
         </button>
-        <button
-          onClick={onAddBreak}
-          className="flex-1 bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 transition-colors duration-300 text-sm font-medium">
+        <button onClick={onAddBreak} className="flex-1 py-2 bg-green-500 text-white font-medium ml-2">
           Add Break
         </button>
       </div>
-    </>
+
+      <div className="flex justify-between mt-2">
+        <button
+          onClick={onSkipToBreak}
+          disabled={!isWorkActive || !hasNextBreak}
+          className={`flex-1 py-2 font-medium ${
+            isWorkActive && hasNextBreak ? 'bg-gray-300 text-gray-800' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}>
+          Take Break
+        </button>
+        <button
+          onClick={onSkipToWork}
+          disabled={isWorkActive || !hasNextWork}
+          className={`flex-1 py-2 font-medium ml-2 ${
+            !isWorkActive && hasNextWork ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}>
+          Start Work
+        </button>
+      </div>
+    </div>
   );
 };
 

@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { usePomodoroStorage } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import TimerControls from './TimerControls';
-import '@src/Popup.css';
 
 const TimerTab: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,6 +20,8 @@ const TimerTab: React.FC = () => {
     addToTimerQueue,
     setSettings,
     removeFromTimerQueue,
+    skipToBreak,
+    skipToWork,
   } = usePomodoroStorage();
 
   const theme = exampleThemeStorage.getSnapshot();
@@ -103,61 +104,51 @@ const TimerTab: React.FC = () => {
     setSettings({ shortBreakDuration: value });
   };
 
+  const handleSkipToBreak = async () => {
+    await skipToBreak();
+  };
+
+  const handleSkipToWork = async () => {
+    await skipToWork();
+  };
+
+  const isWorkActive = timerState.type === 'work';
+  const hasNextWork = timerQueue.some(timer => timer.type === 'work');
+  const hasNextBreak = timerQueue.some(timer => timer.type === 'break');
+
   if (!timerState || !timerQueue || !settings) {
     return null;
   }
 
-  const currentTimer = timerQueue[0] || timerState;
-  const totalTime = currentTimer.type === 'work' ? settings.pomodoroDuration * 60 : settings.shortBreakDuration * 60;
-  const progress = ((totalTime - currentTimer.time) / totalTime) * 100;
-
-  const totalQueueTime = timerQueue.reduce((acc: number, timer: { time: number }) => acc + timer.time, 0);
-  const totalSessionTime = timerState.time + totalQueueTime;
   const totalWorkTime = [timerState, ...timerQueue].reduce(
     (acc, timer) => (timer.type === 'work' ? acc + timer.time : acc),
     0,
   );
 
+  const totalSessionTime = [timerState, ...timerQueue].reduce((acc, timer) => acc + timer.time, 0);
+
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="text-center mb-4">
+    <div className="flex flex-col h-full bg-white text-black">
+      <div className="bg-gray-100 p-4 text-center">
         {isEditing ? (
           <input
             type="text"
             defaultValue={formatTime(timerState.time)}
             onBlur={handleTimeEdit}
-            className={`text-6xl font-bold w-full max-w-xs text-center bg-transparent border-b-2 ${
-              isLight ? 'border-gray-300 focus:border-blue-500' : 'border-gray-700 focus:border-blue-400'
-            }`}
+            className="text-6xl font-bold w-full text-center bg-transparent"
             autoFocus
           />
         ) : (
-          <h2
-            className="text-6xl font-bold cursor-pointer hover:text-blue-500 transition-colors duration-300"
-            onClick={() => setIsEditing(true)}>
+          <h2 className="text-6xl font-bold cursor-pointer" onClick={() => setIsEditing(true)}>
             {formatTime(timerState.time)}
           </h2>
         )}
-        <p className="text-xl mt-2">{timerState.type}</p>
+        <p className="text-xl text-gray-600 mt-2">{timerState.type}</p>
+        <p className="text-sm text-gray-600 mt-1">Total work time: {formatTime(totalWorkTime)}</p>
       </div>
-
-      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
-        <div
-          className={`h-2 rounded-full transition-all duration-300 ${
-            !timerState.isRunning
-              ? 'bg-gray-400 dark:bg-gray-600'
-              : timerState.type === 'work'
-                ? 'bg-green-500'
-                : 'bg-orange-500'
-          }`}
-          style={{ width: `${progress}%` }}></div>
-      </div>
-
-      <p className="text-sm mb-4 dark:text-gray-300">Total work time: {formatTime(totalWorkTime)}</p>
 
       <TimerControls
         isRunning={timerState.isRunning}
-        isLight={isLight}
         onToggleTimer={handleToggleTimer}
         onStopTimer={handleStopTimer}
         onResetTimer={handleResetTimer}
@@ -167,46 +158,35 @@ const TimerTab: React.FC = () => {
         onBreakDurationChange={handleBreakDurationChange}
         onAddWork={handleAddWork}
         onAddBreak={handleAddBreak}
+        onSkipToBreak={handleSkipToBreak}
+        onSkipToWork={handleSkipToWork}
+        isWorkActive={isWorkActive}
+        hasNextWork={hasNextWork}
+        hasNextBreak={hasNextBreak}
       />
 
-      <div className="flex-grow flex flex-col max-h-[200px] overflow-y-auto">
-        <div className="flex-grow overflow-hidden flex flex-col">
-          <h3 className="text-lg font-semibold mb-2 dark:text-gray-300">Timer Queue</h3>
-          <div className="flex-grow overflow-y-auto">
-            <ul className="space-y-2 pr-2">
-              {[timerState, ...timerQueue].map((timer, index) => (
-                <li
-                  key={index}
-                  className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded-md text-sm text-gray-800 dark:text-gray-300">
-                  <span>
-                    {timer.type === 'work' ? 'Work' : 'Break'}: {formatTime(timer.time)}
-                  </span>
-                  {index > 0 && (
-                    <button
-                      onClick={() => removeFromTimerQueue(index - 1)}
-                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
-                      Remove
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
       <div className="mt-4">
-        <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <h3 className="text-lg font-semibold mb-2">Timer Queue</h3>
+        <ul className="space-y-2">
+          {[timerState, ...timerQueue].map((timer, index) => (
+            <li key={index} className="flex justify-between items-center">
+              <span className={timer.type === 'work' ? 'text-blue-600' : 'text-green-600'}>
+                {timer.type === 'work' ? 'Work' : 'Break'}: {formatTime(timer.time)}
+              </span>
+              {index > 0 && (
+                <button onClick={() => removeFromTimerQueue(index - 1)} className="text-red-500 hover:text-red-700">
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="h-2 w-full bg-gray-200 mt-2 rounded-full overflow-hidden">
           {[timerState, ...timerQueue].map((timer, index) => (
             <div
               key={index}
-              className={`h-full ${timer.type === 'work' ? 'bg-blue-500' : 'bg-green-500'} ${
-                index === 0 ? 'opacity-100' : 'opacity-50'
-              }`}
-              style={{
-                width: `${(timer.time / totalSessionTime) * 100}%`,
-                float: 'left',
-              }}
-              title={`${timer.type}: ${formatTime(timer.time)}`}
+              className={`h-full ${timer.type === 'work' ? 'bg-blue-500' : 'bg-green-500'}`}
+              style={{ width: `${(timer.time / totalSessionTime) * 100}%`, float: 'left' }}
             />
           ))}
         </div>

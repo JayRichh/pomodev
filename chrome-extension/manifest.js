@@ -13,10 +13,10 @@ const manifest = deepmerge(
   {
     manifest_version: 3,
     default_locale: 'en',
-    name: 'pomodev',
+    name: 'Pomodev',
     version: packageJson.version,
-    description: 'Pomodoro timer for developers',
-    permissions: ['storage', 'alarms', 'notifications'],
+    description: '',
+    permissions: ['storage', 'alarms', 'notifications', 'action'],
     options_page: 'options/index.html',
     background: {
       service_worker: 'background.iife.js',
@@ -34,10 +34,10 @@ const manifest = deepmerge(
       //   matches: ['http://*/*', 'https://*/*', '<all_urls>'],
       //   js: ['content-ui/index.iife.js'],
       // },
-      {
-        matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-        css: ['content.css'], // public folder
-      },
+      // {
+      //   matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+      //   css: ['content.css'], // public folder
+      // },
     ],
     web_accessible_resources: [
       {
