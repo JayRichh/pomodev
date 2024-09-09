@@ -1,16 +1,20 @@
 import React, { useState, useRef } from 'react';
-import { useStorageSuspense } from '@extension/shared';
+import { usePomodoroStorage, useStorageSuspense } from '@extension/shared';
 import { exampleThemeStorage, Task } from '@extension/storage';
 import { FaSearch, FaSort, FaTimes } from 'react-icons/fa';
 import { createPortal } from 'react-dom';
-
-type Priority = 'low' | 'medium' | 'high';
-type SortBy = 'createdAt' | 'priority' | 'alphabetical';
+import type { SortBy, Priority } from '@extension/shared/lib/hooks/usePomodoroStorage';
 
 interface SearchBarProps {
   searchText: string;
   setSearchText: (text: string) => void;
 }
+
+const priorityColors = {
+  low: 'bg-green-200 dark:bg-green-800',
+  medium: 'bg-yellow-200 dark:bg-yellow-800',
+  high: 'bg-red-200 dark:bg-red-800',
+};
 
 interface SortAndFilterMenuProps {
   sortBy: SortBy;
@@ -18,7 +22,7 @@ interface SortAndFilterMenuProps {
   filterPriority: Priority | 'all';
   setFilterPriority: (priority: Priority | 'all') => void;
   hideCompleted: boolean;
-  setHideCompleted: () => void;
+  toggleHideCompleted: () => void;
 }
 
 const useOutsideClick = (ref: React.RefObject<HTMLElement>, onClickOutside: () => void) => {
@@ -34,7 +38,82 @@ const useOutsideClick = (ref: React.RefObject<HTMLElement>, onClickOutside: () =
     };
   }, [ref, onClickOutside]);
 };
+export const PriorityDropdown: React.FC<{
+  currentPriority: Priority;
+  onChange: (priority: Priority) => void;
+}> = ({ currentPriority, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const theme = useStorageSuspense(exampleThemeStorage);
 
+  useOutsideClick(dropdownRef, () => setIsOpen(false));
+
+  const handleDropdownPosition = (clickY: number) => {
+    const windowHeight = window.innerHeight;
+    const dropdownHeight = 150; // Estimated dropdown height
+    const buffer = 20; // Buffer from the bottom of the screen
+
+    // Check if there's enough space below, otherwise open upwards
+    if (clickY + dropdownHeight + buffer > windowHeight) {
+      setDropdownStyle({
+        top: 'auto',
+        bottom: windowHeight - clickY + 'px',
+      });
+    } else {
+      setDropdownStyle({
+        top: clickY + 'px',
+        bottom: 'auto',
+      });
+    }
+  };
+
+  const handleOpenDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const clickY = event.clientY;
+    setIsOpen(true);
+    handleDropdownPosition(clickY);
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        className="flex items-center p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        onClick={e => handleOpenDropdown(e)}>
+        <div className={`w-4 h-4 mr-1 rounded-full ${priorityColors[currentPriority]}`}></div>
+        <span className="sr-only">Change priority</span>
+      </button>
+      {isOpen &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className={`fixed z-50 w-32 bg-white dark:bg-gray-700 border rounded shadow-lg ${
+              theme === 'light' ? 'bg-white' : 'bg-gray-800'
+            }`}
+            style={{
+              position: 'absolute',
+              left: buttonRef.current?.getBoundingClientRect().left,
+              ...dropdownStyle,
+            }}>
+            {(['low', 'medium', 'high'] as Priority[]).map(priority => (
+              <div
+                key={priority}
+                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+                onClick={() => {
+                  onChange(priority);
+                  setIsOpen(false);
+                }}>
+                <div className={`w-4 h-4 mr-2 rounded-full ${priorityColors[priority]}`}></div>
+                <span className="text-gray-800 dark:text-white capitalize">{priority}</span>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+};
 export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText }) => {
   const [isOpen, setIsOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -64,12 +143,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText 
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
                 placeholder="Search tasks..."
-                className={`w-full p-2 pl-8 pr-10 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full p-2 pl-10 pr-10 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
                 }`}
                 autoFocus
               />
-              <FaSearch className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
               <button
                 onClick={handleClose}
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
@@ -82,14 +161,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText 
     </>
   );
 };
-
 export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
   sortBy,
   setSortBy,
   filterPriority,
   setFilterPriority,
   hideCompleted,
-  setHideCompleted,
+  toggleHideCompleted,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -124,14 +202,20 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
               <div>
                 <label className="block text-sm font-medium mb-1">Sort by:</label>
                 <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value as SortBy)}
+                  value={`${sortBy.field}-${sortBy.order}`}
+                  onChange={e => {
+                    const [field, order] = e.target.value.split('-') as [SortBy['field'], SortBy['order']];
+                    setSortBy({ field, order });
+                  }}
                   className={`w-full p-2 border rounded ${
                     theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
                   }`}>
-                  <option value="createdAt">Created Date</option>
-                  <option value="priority">Priority</option>
-                  <option value="alphabetical">Alphabetical</option>
+                  <option value="createdAt-asc">Created Date (Oldest First)</option>
+                  <option value="createdAt-desc">Created Date (Newest First)</option>
+                  <option value="priority-asc">Priority (Low to High)</option>
+                  <option value="priority-desc">Priority (High to Low)</option>
+                  <option value="alphabetical-asc">Alphabetical (A-Z)</option>
+                  <option value="alphabetical-desc">Alphabetical (Z-A)</option>
                 </select>
               </div>
               <div>
@@ -153,7 +237,7 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
                   type="checkbox"
                   id="hideCompleted"
                   checked={hideCompleted}
-                  onChange={setHideCompleted}
+                  onChange={toggleHideCompleted}
                   className="mr-2"
                 />
                 <label htmlFor="hideCompleted" className="text-sm">
@@ -180,12 +264,19 @@ export const filterAndSortTasks = (
     .filter(task => filterPriority === 'all' || task.priority === filterPriority)
     .filter(task => task.text.toLowerCase().includes(searchText.toLowerCase()))
     .sort((a, b) => {
-      if (sortBy === 'createdAt') return new Date(a.id).getTime() - new Date(b.id).getTime();
-      if (sortBy === 'priority') {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (sortBy.field === 'createdAt') {
+        const comparison = new Date(a.id).getTime() - new Date(b.id).getTime();
+        return sortBy.order === 'asc' ? comparison : -comparison;
       }
-      if (sortBy === 'alphabetical') return a.text.localeCompare(b.text);
+      if (sortBy.field === 'priority') {
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        const comparison = priorityOrder[a.priority] - priorityOrder[b.priority];
+        return sortBy.order === 'asc' ? comparison : -comparison;
+      }
+      if (sortBy.field === 'alphabetical') {
+        const comparison = a.text.localeCompare(b.text);
+        return sortBy.order === 'asc' ? comparison : -comparison;
+      }
       return 0;
     });
 };

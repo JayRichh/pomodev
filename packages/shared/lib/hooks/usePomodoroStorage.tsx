@@ -1,9 +1,24 @@
-//packages\shared\lib\hooks\usePomodoroStorage.tsx
 import { useEffect, useState } from 'react';
 import { pomodoroStorage } from '@extension/storage';
-import type { PomodoroState, TimerState, Task, BreakInterval, Settings } from '../../../storage/lib/pomodoroStorage';
+import type {
+  PomodoroState,
+  TimerState,
+  Task,
+  BreakInterval,
+  Settings,
+  Priority,
+  SortBy,
+} from '../../../storage/lib/pomodoroStorage';
 
-type PomodoroStorageHook = PomodoroState & Omit<typeof pomodoroStorage, keyof PomodoroState>;
+type PomodoroStorageHook = PomodoroState &
+  Omit<typeof pomodoroStorage, keyof PomodoroState> & {
+    filterPriority: Priority | 'all';
+    setFilterPriority: (priority: Priority | 'all') => void;
+    sortBy: SortBy;
+    setSortBy: (sortBy: SortBy) => void;
+    searchText: string;
+    setSearchText: (text: string) => void;
+  };
 
 export function usePomodoroStorage(): PomodoroStorageHook {
   const [state, setState] = useState<PomodoroState>(() => {
@@ -11,20 +26,89 @@ export function usePomodoroStorage(): PomodoroStorageHook {
     return snapshot !== null ? snapshot : getInitialState();
   });
 
+  const [timerState, setTimerState] = useState<TimerState>(state.timerState);
+  const [tasks, setTasks] = useState<Task[]>(state.tasks);
+  const [hideCompleted, setHideCompleted] = useState<boolean>(state.hideCompleted);
+  const [breakIntervals, setBreakIntervals] = useState<BreakInterval[]>(state.breakIntervals);
+  const [timerQueue, setTimerQueue] = useState<TimerState[]>(state.timerQueue);
+  const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'settings'>(state.activeTab);
+  const [settings, setSettings] = useState<Settings>(state.settings);
+  const [allTasksCollapsed, setAllTasksCollapsed] = useState<boolean>(state.allTasksCollapsed);
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>(state.expandedTasks);
+  const [filterPriority, setFilterPriority] = useState<Priority | 'all'>(state.filterPriority);
+  const [sortBy, setSortBy] = useState<SortBy>(state.sortBy || { field: 'createdAt', order: 'asc' });
+  const [searchText, setSearchText] = useState<string>(state.searchText);
+
   useEffect(() => {
     const unsubscribe = pomodoroStorage.subscribe(() => {
       const newState = pomodoroStorage.getSnapshot();
       if (newState !== null) {
         setState(newState);
+        setTimerState(newState.timerState);
+        setTasks(newState.tasks);
+        setHideCompleted(newState.hideCompleted);
+        setBreakIntervals(newState.breakIntervals);
+        setTimerQueue(newState.timerQueue);
+        setActiveTab(newState.activeTab);
+        setSettings(newState.settings);
+        setAllTasksCollapsed(newState.allTasksCollapsed);
+        setExpandedTasks(newState.expandedTasks);
+        setFilterPriority(newState.filterPriority);
+        setSortBy(newState.sortBy);
+        setSearchText(newState.searchText);
       }
     });
-
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    pomodoroStorage.set({
+      timerState,
+      tasks,
+      hideCompleted,
+      breakIntervals,
+      timerQueue,
+      activeTab,
+      settings,
+      allTasksCollapsed,
+      expandedTasks,
+      filterPriority,
+      sortBy,
+      searchText,
+    });
+  }, [
+    timerState,
+    tasks,
+    hideCompleted,
+    breakIntervals,
+    timerQueue,
+    activeTab,
+    settings,
+    allTasksCollapsed,
+    expandedTasks,
+    filterPriority,
+    sortBy,
+    searchText,
+  ]);
 
   return {
     ...state,
     ...pomodoroStorage,
+    timerState,
+    tasks,
+    hideCompleted,
+    breakIntervals,
+    timerQueue,
+    activeTab,
+    settings,
+    allTasksCollapsed,
+    expandedTasks,
+    filterPriority,
+    setFilterPriority,
+    sortBy,
+    setSortBy,
+    searchText,
+    setSearchText,
   };
 }
 
@@ -43,12 +127,11 @@ function getInitialState(): PomodoroState {
       longBreakInterval: 4,
     },
     allTasksCollapsed: false,
-    setTasks: async tasks => {
-      const currentState = await pomodoroStorage.get();
-      const newState = { ...currentState, tasks };
-      await pomodoroStorage.set(newState);
-    },
+    expandedTasks: {},
+    filterPriority: 'all',
+    sortBy: { field: 'createdAt', order: 'asc' },
+    searchText: '',
   };
 }
 
-export type { PomodoroState, TimerState, Task, BreakInterval, Settings };
+export type { PomodoroState, TimerState, Task, BreakInterval, Settings, Priority, SortBy };
