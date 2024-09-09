@@ -20,7 +20,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ time, type, totalWorkTime, 
   };
 
   return (
-    <div className="bg-gray-100 p-4 text-center">
+    <div className=" p-4 text-center">
       {isEditing ? (
         <input
           type="text"

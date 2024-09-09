@@ -16,7 +16,7 @@ const manifest = deepmerge(
     name: 'Pomodev',
     version: packageJson.version,
     description: '',
-    permissions: ['storage', 'alarms', 'notifications', 'action'],
+    permissions: ['storage', 'alarms', 'notifications'],
     options_page: 'options/index.html',
     background: {
       service_worker: 'background.iife.js',

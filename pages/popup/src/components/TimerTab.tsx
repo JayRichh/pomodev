@@ -129,7 +129,7 @@ const TimerTab: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-white text-black">
-      <div className="bg-gray-100 p-4 text-center">
+      <div className="p-4 text-center">
         {isEditing ? (
           <input
             type="text"

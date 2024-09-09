@@ -33,7 +33,7 @@ export interface PomodoroState {
   breakIntervals: BreakInterval[];
   timerQueue: TimerState[];
   settings: Settings;
-  allTasksCollapsed: boolean; // Add this line
+  allTasksCollapsed: boolean;
   activeTab: 'timer' | 'tasks' | 'settings';
   setTasks: (tasks: Task[]) => Promise<void>;
 }
