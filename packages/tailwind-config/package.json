@@ -1,6 +1,6 @@
 {
   "name": "@extension/tailwindcss-config",
-  "version": "0.2.6",
+  "version": "0.2.7",
 
   "description": "Tailwind CSS configuration for app",
   "main": "./tailwind.config.js",
