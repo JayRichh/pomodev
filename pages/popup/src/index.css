@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* Light mode variables */
     --background: 60 30% 98%;
     --foreground: 120 20% 12%;
     --card: 60 35% 96%;
@@ -30,7 +31,9 @@
     --chart-4: 40 65% 50%;
     --chart-5: 0 55% 45%;
   }
+
   .dark {
+    /* Dark mode variables */
     --background: 200 15% 12%;
     --foreground: 60 20% 92%;
     --card: 200 15% 16%;
@@ -56,125 +59,135 @@
     --chart-4: 340 30% 45%;
     --chart-5: 60 30% 45%;
   }
-}
-/* Reset and base styles */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-body {
-  width: 300px;
-  min-height: 500px;
-  max-height: 750px;
-  height: auto;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-y: auto;
-}
-#app-container {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-/* Scrollbar styles */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-/* Styles for number inputs */
-input[type="number"] {
-  display: inline-block;
-  width: 100%;
-  padding: 8px 12px 8px 8px;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #333;
-  background-color: #fff;
-  background-clip: padding-box;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-}
-
-input[type="number"]:focus {
-  color: #495057;
-  background-color: #fff;
-  border-color: #80bdff;
-  outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-/* Ensure number input chevrons are visible */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  opacity: 1; /* Ensures chevrons are visible */
-  position: static; /* Avoids them being hidden or misplaced */
-}
-input[type="number"] {
-  -moz-appearance: textfield; /* Ensures chevrons render in Firefox */
-  appearance: auto; /* Use default appearance for chevrons */
-  max-width: 6rem;
-}
-
-input[type="number"]::placeholder {
-  color: #6c757d;
-  opacity: 1;
-}
-
-input[type="number"]:disabled,
-input[type="number"][readonly] {
-  background-color: #e9ecef;
-  opacity: 1;
-}
-/* High contrast mode support */
-@media screen and (-ms-high-contrast: active) {
-  input[type="number"] {
-    border: 2px solid currentColor;
+  
+  /* Reset and base styles */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-}
+  
+  body {
+    width: 300px;
+    min-height: 500px;
+    max-height: 750px;
+    height: auto;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-y: auto;
+  }
 
-/* Focus visible polyfill */
-input[type="number"]:focus:not(:focus-visible) {
-  outline: 0;
-  box-shadow: none;
-}
+  #app-container {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
 
-input[type="number"]:focus-visible {
-  outline: 2px solid #000;
-  outline-offset: 2px;
-}
+  /* Scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-/* Ensure number input chevrons are always visible and slightly larger */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  opacity: 1;
-  transform: scale(1.7);
-}
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-/* Improve typography for better legibility */
-input[type="number"] {
-  font-feature-settings: "tnum" 1;
-  letter-spacing: 0.5px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
 
-/* Increase clickable area for better touch interaction */
-input[type="number"] {
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  /* Styles for number inputs */
+  input[type="number"] {
+    display: inline-block;
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    background-color: var(--input);
+    background-clip: padding-box;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+
+  input[type="number"]:focus {
+    color: var(--foreground);
+    background-color: var(--input);
+    border-color: var(--ring);
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(var(--ring) / 0.25);
+  }
+
+  /* Ensure number input chevrons are visible */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    position: static;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: auto;
+    max-width: 8rem;
+  }
+
+  input[type="number"]::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  input[type="number"]:disabled,
+  input[type="number"][readonly] {
+    background-color: var(--muted);
+    opacity: 1;
+  }
+
+  /* Improve touch interaction and ensure chevrons are visible */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+
+  /* High contrast mode support */
+  @media screen and (-ms-high-contrast: active) {
+    input[type="number"] {
+      border: 2px solid currentColor;
+    }
+  }
+
+  /* Ensure inputs are accessible for better touch interaction */
+  input[type="number"]:focus:not(:focus-visible) {
+    outline: 0;
+    box-shadow: none;
+  }
+
+  input[type="number"]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Improve typography for better legibility */
+  input[type="number"] {
+    font-feature-settings: "tnum" 1;
+    letter-spacing: 0.5px;
+  }
+
+  /* Spacing and sizing for better UX */
+  input[type="number"] {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-width: 8rem;
+  }
 }

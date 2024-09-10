@@ -14,7 +14,16 @@ const Popup: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(storedActiveTab);
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
+  useEffect(() => {
+    if (isLight) {
+      document.body.classList.remove('dark');
+    } else {
+      document.body.classList.add('dark');
+    }
 
+    document.body.style.backgroundColor = isLight ? 'hsl(var(--background))' : 'hsl(var(--background))';
+    document.body.style.color = isLight ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))';
+  }, [isLight]);
   useEffect(() => {
     setStoredActiveTab(activeTab);
   }, [activeTab, setStoredActiveTab]);
@@ -25,7 +34,7 @@ const Popup: React.FC = () => {
 
   return (
     <div
-      className={`w-full h-full flex flex-col ${isLight ? 'bg-background text-foreground' : 'bg-background dark:text-foreground'}`}>
+      className={`w-full h-full flex flex-col ${isLight ? 'bg-background text-foreground' : 'bg-gray-800 text-white'}`}>
       <nav className="flex justify-between relative bg-transparent">
         <div
           className={`absolute top-0 bottom-0 left-0 transition-all duration-500 ease-in-out transform 
@@ -36,7 +45,7 @@ const Popup: React.FC = () => {
                   ? 'w-1/3 translate-x-full'
                   : 'w-1/3 translate-x-[200%]'
             }
-            bg-primary opacity-90 shadow-lg
+            ${isLight ? 'bg-primary opacity-90 shadow-lg' : 'bg-gray-600 opacity-90 shadow-lg'}
           `}
         />
         {(['timer', 'tasks', 'settings'] as const).map(tab => (
@@ -44,13 +53,14 @@ const Popup: React.FC = () => {
             key={tab}
             onClick={() => handleTabChange(tab)}
             className={`flex-1 py-3 text-lg font-bold z-10 transition-all duration-300 transform tracking-wider
-              ${activeTab === tab ? 'text-primary-foreground scale-105' : 'text-muted-foreground hover:text-foreground'}
+              ${activeTab === tab ? (isLight ? 'text-primary-foreground scale-105' : 'text-blue-400 scale-105') : isLight ? 'text-muted-foreground hover:text-foreground' : 'text-gray-400 hover:text-white'}
             `}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </nav>
-      <div className={`content-container flex-grow overflow-auto ${activeTab === 'tasks' ? 'p-0' : 'p-4'}`}>
+      <div
+        className={`content-container flex-grow overflow-auto ${activeTab === 'tasks' ? 'p-0' : 'p-4'} ${isLight ? 'bg-background' : 'bg-gray-800'}`}>
         {activeTab === 'timer' && <TimerTab />}
         {activeTab === 'tasks' && <TasksTab />}
         {activeTab === 'settings' && <SettingsTab />}

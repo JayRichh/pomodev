@@ -1,5 +1,7 @@
 import React from 'react';
 import { TimerState } from '@extension/storage/lib/pomodoroStorage';
+import { useStorageSuspense } from '@extension/shared';
+import { exampleThemeStorage } from '@extension/storage';
 
 interface TimerQueueProps {
   currentTimer: TimerState;
@@ -10,10 +12,11 @@ interface TimerQueueProps {
 
 const TimerQueue: React.FC<TimerQueueProps> = ({ currentTimer, queue, onRemove, formatTime }) => {
   const totalTime = [currentTimer, ...queue].reduce((acc, timer) => acc + timer.time, 0);
-
+  const theme = useStorageSuspense(exampleThemeStorage);
+  const isLight = theme === 'light';
   return (
     <div className="mt-4">
-      <h3 className="text-lg font-semibold mb-2">Timer Queue</h3>
+      <h3 className={`text-lg font-semibold mb-2 ${isLight ? 'text-gray-800' : 'text-gray-100'}`}>Timer Queue</h3>
       <ul className="space-y-2">
         {[currentTimer, ...queue].map((timer, index) => (
           <li key={index} className="flex justify-between items-center">
@@ -28,7 +31,7 @@ const TimerQueue: React.FC<TimerQueueProps> = ({ currentTimer, queue, onRemove, 
           </li>
         ))}
       </ul>
-      <div className="h-2 w-full bg-gray-200 mt-2 rounded-full overflow-hidden">
+      <div className={`h-2 w-full mt-2 rounded-full overflow-hidden ${isLight ? 'bg-gray-200' : 'bg-gray-600'}`}>
         {[currentTimer, ...queue].map((timer, index) => (
           <div
             key={index}

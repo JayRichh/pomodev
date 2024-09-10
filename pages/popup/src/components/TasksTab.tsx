@@ -70,9 +70,8 @@ const TasksTab: React.FC = () => {
   }, [deleteAllTasks]);
 
   return (
-    <div
-      className={`flex flex-col h-full rounded-lg shadow-lg w-full overflow-hidden ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
-      <div className="flex justify-between items-center w-full p-2 border-b border-gray-200 dark:border-gray-700">
+    <div className={`flex flex-col h-full rounded-lg shadow-lg w-full overflow-hidden bg-background text-foreground`}>
+      <div className={`flex justify-between items-center w-full p-2 border-b border-border`}>
         <div className="flex items-center space-x-1">
           <SearchBar searchText={searchText} setSearchText={setSearchText} />
           <SortAndFilterMenu
@@ -87,14 +86,15 @@ const TasksTab: React.FC = () => {
         <div className="flex items-center space-x-1">
           <button
             onClick={handleDeleteAllTasks}
-            className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors duration-200"
+            className="p-2 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors duration-200"
             title="Delete all tasks">
             <FaTrash size={12} />
           </button>
         </div>
       </div>
 
-      <ul className="flex-grow overflow-y-auto w-full p-2 pb-10">
+      <ul
+        className={`flex-grow overflow-y-auto w-full p-2 pb-10 ${theme === 'light' ? 'scrollbar-light' : 'scrollbar-dark'}`}>
         {filteredAndSortedTasks.map(task => (
           <TaskItem
             key={task.id}
@@ -106,24 +106,21 @@ const TasksTab: React.FC = () => {
           />
         ))}
       </ul>
+
       <form
         onSubmit={handleAddTask}
-        className={`flex w-full fixed bottom-0 z-50 left-0 right-0 ${theme === 'light' ? 'bg-white' : 'bg-gray-700'} border-t border-gray-200 dark:border-gray-600`}>
+        className={`flex w-full fixed bottom-0 z-50 left-0 right-0 ${theme === 'light' ? 'bg-white' : 'bg-gray-700'} border-t ${theme === 'light' ? 'border-gray-200' : 'border-gray-600'}`}>
         <input
           type="text"
           value={newTaskText}
           onChange={e => setNewTaskText(e.target.value)}
           placeholder="Add a new task"
-          className={`flex-grow p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
-          }`}
+          className={`flex-grow p-2 focus:outline-none focus:ring-2 ${theme === 'light' ? 'focus:ring-blue-500 bg-white text-gray-800' : 'focus:ring-blue-500 bg-gray-700 text-white'}`}
         />
         <select
           value={newTaskPriority}
           onChange={e => setNewTaskPriority(e.target.value as Priority)}
-          className={`p-2 border-l border-r border-gray-300 dark:border-gray-600 ${
-            theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
-          }`}>
+          className={`p-2 border-l border-r ${theme === 'light' ? 'border-gray-300 bg-white text-gray-800' : 'border-gray-600 bg-gray-700 text-white'}`}>
           <option value="low">Low</option>
           <option value="medium">Medium</option>
           <option value="high">High</option>
@@ -138,13 +135,13 @@ const TasksTab: React.FC = () => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div
-            className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-sm w-full ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
+            className={`p-4 rounded-lg shadow-lg max-w-sm w-full ${theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-800 text-white'}`}>
             <h3 className="text-lg font-semibold mb-2">Confirm Delete All Tasks</h3>
             <p className="mb-4">Are you sure you want to delete all tasks? This action cannot be undone.</p>
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors duration-200">
+                className={`px-4 py-2 rounded transition-colors duration-200 ${theme === 'light' ? 'bg-gray-300 text-gray-800 hover:bg-gray-400' : 'bg-gray-600 text-white hover:bg-gray-500'}`}>
                 Cancel
               </button>
               <button
@@ -159,5 +156,4 @@ const TasksTab: React.FC = () => {
     </div>
   );
 };
-
 export default TasksTab;

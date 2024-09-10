@@ -47,7 +47,7 @@ export enum SessionAccessLevel {
   ExtensionPagesAndContentScripts = 'TRUSTED_AND_UNTRUSTED_CONTEXTS',
 }
 
-type ValueOrUpdate<D> = D | ((prev: D) => Promise<D> | D);
+export type ValueOrUpdate<D> = D | ((prev: D) => Promise<D> | D);
 
 export type BaseStorage<D> = {
   get: () => Promise<D>;

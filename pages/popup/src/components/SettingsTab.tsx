@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { usePomodoroStorage } from '@extension/shared';
+import { usePomodoroStorage, useStorageSuspense } from '@extension/shared';
 import { pomodoroStorage, exampleThemeStorage } from '@extension/storage';
 import { Sun, Moon } from 'lucide-react';
 
 const SettingsTab: React.FC = () => {
   const pomodoroState = usePomodoroStorage();
-  const theme = exampleThemeStorage.getSnapshot();
+  const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
 
   const defaultSettings = {
@@ -50,27 +50,28 @@ const SettingsTab: React.FC = () => {
     setIsDirty(false);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    exampleThemeStorage.toggle();
-  }, []);
-
   return (
     <div
-      className={`flex flex-col h-full ${isLight ? 'bg-white text-black' : 'text-white'} transition-colors duration-500`}>
+      className={`flex flex-col h-full ${isLight ? 'bg-background text-foreground' : 'bg-background dark:text-foreground'}`}>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Settings</h2>
-        {/* <button
-          onClick={toggleTheme}
-          className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
-          aria-label="Toggle theme"
-        >
-          {isLight ? <Moon className="text-gray-800" size={24} /> : <Sun className="text-white" size={24} />}
-        </button> */}
+        <h2 className={`text-2xl font-bold ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}>Settings</h2>
+        <button
+          onClick={exampleThemeStorage.toggle}
+          className={`p-2 rounded-full ${isLight ? 'hover:bg-secondary/80' : 'dark:hover:bg-secondary/80'} transition-colors duration-200`}
+          aria-label="Toggle theme">
+          {isLight ? (
+            <Moon className="text-foreground" size={24} />
+          ) : (
+            <Sun className="dark:text-foreground" size={24} />
+          )}
+        </button>
       </div>
 
       <div className="flex-grow overflow-y-auto pr-4 -mr-4">
         <section className="mb-8">
-          <h3 className="text-lg font-semibold mb-4">Timer Settings</h3>
+          <h3 className={`text-lg font-semibold mb-4 ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}>
+            Timer Settings
+          </h3>
           <div className="space-y-4">
             <NumberSetting
               label="Pomodoro Duration (minutes)"
@@ -100,16 +101,18 @@ const SettingsTab: React.FC = () => {
         </section>
       </div>
 
-      <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className={`mt-auto pt-4 border-t ${isLight ? 'border-border' : 'dark:border-border'}`}>
         <div className="flex justify-between items-center mb-4">
-          <span className={`text-sm font-medium ${isDirty ? 'text-yellow-500' : 'text-green-500'}`}>
+          <span className={`text-sm font-medium ${isDirty ? 'text-destructive' : 'text-primary'}`}>
             {isDirty ? 'Unsaved changes' : 'All changes saved'}
           </span>
           <button
             onClick={resetSettings}
-            className={`px-3 py-1 text-sm rounded transition-colors duration-200 ${
-              isLight ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-gray-700 text-white hover:bg-gray-600'
-            }`}>
+            className={`px-3 py-1 text-sm rounded ${
+              isLight
+                ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                : 'dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/80'
+            } transition-colors duration-200`}>
             Reset to Defaults
           </button>
         </div>
@@ -122,8 +125,8 @@ const SettingsTab: React.FC = () => {
               ${
                 isDirty
                   ? isLight
-                    ? 'bg-gray-300 text-gray-800 hover:bg-gray-400'
-                    : 'bg-gray-700 text-white hover:bg-gray-600'
+                    ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    : 'dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/80'
                   : 'opacity-50 cursor-not-allowed'
               }
             `}>
@@ -137,8 +140,8 @@ const SettingsTab: React.FC = () => {
               ${
                 isDirty
                   ? isLight
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                    : 'dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/80'
                   : 'opacity-50 cursor-not-allowed'
               }
             `}>
@@ -150,25 +153,25 @@ const SettingsTab: React.FC = () => {
   );
 };
 
-export const NumberSetting: React.FC<{
-  label?: string;
+const NumberSetting: React.FC<{
+  label: string;
   value: number;
   onChange: (value: number) => void;
   isLight: boolean;
 }> = ({ label, value, onChange, isLight }) => {
   return (
     <div className="flex items-center justify-between">
-      {{ label } && (
-        <label className={`text-sm font-medium ${isLight ? 'text-gray-700' : 'text-gray-200'}`}>{label}</label>
-      )}
+      <label className={`text-sm font-medium ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}>{label}</label>
       <input
         type="number"
         min="1"
         value={value}
         onChange={e => onChange(Number(e.target.value))}
         className={`w-20 p-1 rounded ${
-          isLight ? 'text-black border-gray-300 bg-white' : 'text-white bg-gray-700 border-gray-600'
-        }`}
+          isLight
+            ? 'text-foreground bg-background border-input'
+            : 'dark:text-foreground dark:bg-background dark:border-input'
+        } border focus:border-ring focus:ring-1 focus:ring-ring`}
       />
     </div>
   );

@@ -38,10 +38,10 @@ const useOutsideClick = (ref: React.RefObject<HTMLElement>, onClickOutside: () =
     };
   }, [ref, onClickOutside]);
 };
-export const PriorityDropdown: React.FC<{
-  currentPriority: Priority;
-  onChange: (priority: Priority) => void;
-}> = ({ currentPriority, onChange }) => {
+export const PriorityDropdown: React.FC<{ currentPriority: Priority; onChange: (priority: Priority) => void }> = ({
+  currentPriority,
+  onChange,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -50,29 +50,30 @@ export const PriorityDropdown: React.FC<{
 
   useOutsideClick(dropdownRef, () => setIsOpen(false));
 
-  const handleDropdownPosition = (clickY: number) => {
-    const windowHeight = window.innerHeight;
-    const dropdownHeight = 150; // Estimated dropdown height
-    const buffer = 20; // Buffer from the bottom of the screen
+  const handleDropdownPosition = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // Check if there's enough space to the right, otherwise open to the left
+    const windowWidth = window.innerWidth;
+    const dropdownWidth = 150; // Estimated dropdown width
+    const buffer = 20; // Buffer from the right edge of the screen
 
-    // Check if there's enough space below, otherwise open upwards
-    if (clickY + dropdownHeight + buffer > windowHeight) {
+    if (event.clientX + dropdownWidth + buffer > windowWidth) {
       setDropdownStyle({
-        top: 'auto',
-        bottom: windowHeight - clickY + 'px',
+        right: windowWidth - event.clientX + 'px',
+        left: 'auto',
+        top: event.clientY + 'px',
       });
     } else {
       setDropdownStyle({
-        top: clickY + 'px',
-        bottom: 'auto',
+        left: event.clientX + 'px',
+        right: 'auto',
+        top: event.clientY + 'px',
       });
     }
   };
 
   const handleOpenDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const clickY = event.clientY;
     setIsOpen(true);
-    handleDropdownPosition(clickY);
+    handleDropdownPosition(event);
   };
 
   return (
@@ -80,7 +81,7 @@ export const PriorityDropdown: React.FC<{
       <button
         ref={buttonRef}
         className="flex items-center p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        onClick={e => handleOpenDropdown(e)}>
+        onClick={handleOpenDropdown}>
         <div className={`w-4 h-4 mr-1 rounded-full ${priorityColors[currentPriority]}`}></div>
         <span className="sr-only">Change priority</span>
       </button>
@@ -114,7 +115,11 @@ export const PriorityDropdown: React.FC<{
     </>
   );
 };
-export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText }) => {
+// SearchBar Component
+export const SearchBar: React.FC<{ searchText: string; setSearchText: (text: string) => void }> = ({
+  searchText,
+  setSearchText,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const theme = useStorageSuspense(exampleThemeStorage);
@@ -130,13 +135,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText 
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
+        className={`p-2 rounded-full transition-colors duration-200 ${
+          theme === 'light' ? 'hover:bg-gray-200' : 'dark:hover:bg-gray-700'
+        }`}
         title="Search tasks">
-        <FaSearch className="text-gray-600 dark:text-gray-300" size={16} />
+        <FaSearch className={`${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`} size={16} />
       </button>
       {isOpen &&
         createPortal(
-          <div ref={searchRef} className="fixed inset-x-0 top-0 z-50 p-4 bg-white dark:bg-gray-800 shadow-lg">
+          <div
+            ref={searchRef}
+            className={`fixed inset-x-0 top-0 z-50 p-4 shadow-lg ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
             <div className="relative max-w-2xl mx-auto">
               <input
                 type="text"
@@ -151,7 +160,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText 
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
               <button
                 onClick={handleClose}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full ${
+                  theme === 'light' ? 'hover:bg-gray-200' : 'dark:hover:bg-gray-600'
+                } transition-colors duration-200`}>
                 <FaTimes className="text-gray-400" size={16} />
               </button>
             </div>
@@ -161,14 +172,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({ searchText, setSearchText 
     </>
   );
 };
-export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
-  sortBy,
-  setSortBy,
-  filterPriority,
-  setFilterPriority,
-  hideCompleted,
-  toggleHideCompleted,
-}) => {
+
+// Sort and Filter Menu Component
+export const SortAndFilterMenu: React.FC<{
+  sortBy: SortBy;
+  setSortBy: (sortBy: SortBy) => void;
+  filterPriority: Priority | 'all';
+  setFilterPriority: (priority: Priority | 'all') => void;
+  hideCompleted: boolean;
+  toggleHideCompleted: () => void;
+}> = ({ sortBy, setSortBy, filterPriority, setFilterPriority, hideCompleted, toggleHideCompleted }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const theme = useStorageSuspense(exampleThemeStorage);
@@ -179,28 +192,37 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
+        className={`p-2 rounded-full transition-colors duration-200 ${
+          theme === 'light' ? 'hover:bg-gray-200' : 'dark:hover:bg-gray-700'
+        }`}
         title="Sort and filter options">
-        <FaSort className="text-gray-600 dark:text-gray-300" size={16} />
+        <FaSort className={`${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`} size={16} />
       </button>
       {isOpen &&
         createPortal(
           <div
             ref={menuRef}
-            className={`fixed right-0 top-0 h-full w-64 z-50 p-4 ${
+            className={`fixed right-0 top-0 h-full w-64 z-50 p-4 shadow-lg overflow-y-auto ${
               theme === 'light' ? 'bg-white' : 'bg-gray-800'
-            } shadow-lg overflow-y-auto`}>
+            }`}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Sort and Filter</h3>
+              <h3 className={`text-lg font-semibold ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
+                Sort and Filter
+              </h3>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200">
-                <FaTimes className="text-gray-600 dark:text-gray-300" size={16} />
+                className={`p-1 rounded-full transition-colors duration-200 ${
+                  theme === 'light' ? 'hover:bg-gray-200' : 'dark:hover:bg-gray-700'
+                }`}>
+                <FaTimes className={`${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`} size={16} />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Sort by:</label>
+                <label
+                  className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
+                  Sort by:
+                </label>
                 <select
                   value={`${sortBy.field}-${sortBy.order}`}
                   onChange={e => {
@@ -208,7 +230,9 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
                     setSortBy({ field, order });
                   }}
                   className={`w-full p-2 border rounded ${
-                    theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
+                    theme === 'light'
+                      ? 'bg-white text-gray-800 border-gray-300'
+                      : 'bg-gray-700 text-white border-gray-600'
                   }`}>
                   <option value="createdAt-asc">Created Date (Oldest First)</option>
                   <option value="createdAt-desc">Created Date (Newest First)</option>
@@ -219,12 +243,17 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Filter by priority:</label>
+                <label
+                  className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
+                  Filter by priority:
+                </label>
                 <select
                   value={filterPriority}
                   onChange={e => setFilterPriority(e.target.value as Priority | 'all')}
                   className={`w-full p-2 border rounded ${
-                    theme === 'light' ? 'bg-white text-gray-800' : 'bg-gray-700 text-white'
+                    theme === 'light'
+                      ? 'bg-white text-gray-800 border-gray-300'
+                      : 'bg-gray-700 text-white border-gray-600'
                   }`}>
                   <option value="all">All Priorities</option>
                   <option value="low">Low</option>
@@ -240,7 +269,9 @@ export const SortAndFilterMenu: React.FC<SortAndFilterMenuProps> = ({
                   onChange={toggleHideCompleted}
                   className="mr-2"
                 />
-                <label htmlFor="hideCompleted" className="text-sm">
+                <label
+                  htmlFor="hideCompleted"
+                  className={`text-sm ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
                   Hide completed tasks
                 </label>
               </div>

@@ -1,4 +1,4 @@
-import { createStorage, StorageType, BaseStorage } from './base';
+import { createStorage, StorageType, BaseStorage, ValueOrUpdate } from './base';
 
 export interface TimerState {
   time: number;
@@ -80,6 +80,7 @@ type PomodoroStorage = BaseStorage<PomodoroState> & {
   setExpandedTasks: (expandedTasks: Record<string, boolean>) => Promise<void>;
   toggleTaskExpanded: (taskId: string) => Promise<void>;
 };
+
 function toggleTaskInTree(tasks: Task[], taskId: string): Task[] {
   return tasks.map(task => {
     if (task.id === taskId) {
@@ -158,134 +159,163 @@ const storage = createStorage<PomodoroState>('pomodoro-storage-key', initialStat
   liveUpdate: true,
 });
 
+async function getPersistentState(): Promise<PomodoroState> {
+  try {
+    const state = await storage.get();
+    return state ? { ...initialState, ...state } : initialState;
+  } catch (error) {
+    console.error('Error retrieving state:', error);
+    return initialState;
+  }
+}
+
+async function setPersistentState(value: ValueOrUpdate<PomodoroState>): Promise<void> {
+  try {
+    await storage.set(value);
+  } catch (error) {
+    console.error('Error setting state:', error);
+  }
+}
 export const pomodoroStorage: PomodoroStorage = {
   ...storage,
 
+  get: getPersistentState,
+  set: setPersistentState,
+
   setActiveTab: async tab => {
-    const currentState = await storage.get();
-    const newState = { ...currentState, activeTab: tab };
-    await storage.set(newState);
+    await setPersistentState(prevState => ({
+      ...prevState,
+      activeTab: tab,
+    }));
   },
 
   toggleTimer: async () => {
-    const currentState = await storage.get();
-    const now = Date.now();
-    const newIsRunning = !currentState.timerState.isRunning;
-    let newTime = currentState.timerState.time;
-    let newQueue = [...currentState.timerQueue];
-    let newType = currentState.timerState.type;
+    await setPersistentState(async currentState => {
+      const now = Date.now();
+      const newIsRunning = !currentState.timerState.isRunning;
+      let newTime = currentState.timerState.time;
+      let newQueue = [...currentState.timerQueue];
+      let newType = currentState.timerState.type;
 
-    if (currentState.timerState.isRunning) {
-      const elapsed = Math.floor((now - currentState.timerState.lastUpdated) / 1000);
-      newTime = Math.max(0, currentState.timerState.time - elapsed);
-    }
-
-    if (newTime === 0 && newQueue.length > 0) {
-      const nextTimer = newQueue.shift();
-      if (nextTimer) {
-        newTime = nextTimer.time;
-        newType = nextTimer.type;
+      if (currentState.timerState.isRunning) {
+        const elapsed = Math.floor((now - currentState.timerState.lastUpdated) / 1000);
+        newTime = Math.max(0, currentState.timerState.time - elapsed);
       }
-    }
 
-    await storage.set(state => ({
-      ...state,
-      timerState: {
-        ...state.timerState,
-        isRunning: newIsRunning,
-        lastUpdated: now,
+      if (newTime === 0 && newQueue.length > 0) {
+        const nextTimer = newQueue.shift();
+        if (nextTimer) {
+          newTime = nextTimer.time;
+          newType = nextTimer.type;
+        }
+      }
+
+      const newState = {
+        ...currentState,
+        timerState: {
+          ...currentState.timerState,
+          isRunning: newIsRunning,
+          lastUpdated: now,
+          time: newTime,
+          type: newType,
+        },
+        timerQueue: newQueue,
+      };
+
+      if (newIsRunning) {
+        await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: newTime / 60 });
+      } else {
+        await pomodoroStorage.clearAlarm('pomodoroTimer');
+      }
+
+      chrome.runtime.sendMessage({
+        type: newIsRunning ? 'START_TIMER' : 'PAUSE_TIMER',
         time: newTime,
-        type: newType,
-      },
-      timerQueue: newQueue,
-    }));
+        timerType: newType,
+      });
 
-    if (newIsRunning) {
-      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: newTime / 60 });
-    } else {
-      await pomodoroStorage.clearAlarm('pomodoroTimer');
-    }
-
-    chrome.runtime.sendMessage({
-      type: newIsRunning ? 'START_TIMER' : 'PAUSE_TIMER',
-      time: newTime,
-      timerType: newType,
+      return newState;
     });
   },
 
   skipToBreak: async () => {
-    const currentState = await storage.get();
-    if (currentState.timerState.type !== 'work' || currentState.timerQueue.length === 0) {
-      return; // Can't skip if not in work or no breaks in queue
-    }
+    await setPersistentState(async currentState => {
+      if (currentState.timerState.type !== 'work' || currentState.timerQueue.length === 0) {
+        return currentState;
+      }
 
-    const nextBreak = currentState.timerQueue.find(timer => timer.type === 'break');
-    if (!nextBreak) {
-      return; // No break found in queue
-    }
+      const nextBreak = currentState.timerQueue.find(timer => timer.type === 'break');
+      if (!nextBreak) {
+        return currentState;
+      }
 
-    await storage.set(state => ({
-      ...state,
-      timerState: {
-        ...nextBreak,
-        isRunning: state.timerState.isRunning,
-        lastUpdated: Date.now(),
-      },
-      timerQueue: state.timerQueue.filter(timer => timer !== nextBreak),
-    }));
+      const newState = {
+        ...currentState,
+        timerState: {
+          ...nextBreak,
+          isRunning: currentState.timerState.isRunning,
+          lastUpdated: Date.now(),
+        },
+        timerQueue: currentState.timerQueue.filter(timer => timer !== nextBreak),
+      };
 
-    if (currentState.timerState.isRunning) {
-      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextBreak.time / 60 });
-    }
+      if (currentState.timerState.isRunning) {
+        await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextBreak.time / 60 });
+      }
 
-    chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextBreak });
+      chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextBreak });
+
+      return newState;
+    });
   },
 
   skipToWork: async () => {
-    const currentState = await storage.get();
-    if (currentState.timerState.type !== 'break' || currentState.timerQueue.length === 0) {
-      return; // Can't skip if not in break or no work in queue
-    }
+    await setPersistentState(async currentState => {
+      if (currentState.timerState.type !== 'break' || currentState.timerQueue.length === 0) {
+        return currentState;
+      }
 
-    const nextWork = currentState.timerQueue.find(timer => timer.type === 'work');
-    if (!nextWork) {
-      return; // No work found in queue
-    }
+      const nextWork = currentState.timerQueue.find(timer => timer.type === 'work');
+      if (!nextWork) {
+        return currentState;
+      }
 
-    await storage.set(state => ({
-      ...state,
-      timerState: {
-        ...nextWork,
-        isRunning: state.timerState.isRunning,
-        lastUpdated: Date.now(),
-      },
-      timerQueue: state.timerQueue.filter(timer => timer !== nextWork),
-    }));
+      const newState = {
+        ...currentState,
+        timerState: {
+          ...nextWork,
+          isRunning: currentState.timerState.isRunning,
+          lastUpdated: Date.now(),
+        },
+        timerQueue: currentState.timerQueue.filter(timer => timer !== nextWork),
+      };
 
-    if (currentState.timerState.isRunning) {
-      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextWork.time / 60 });
-    }
+      if (currentState.timerState.isRunning) {
+        await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: nextWork.time / 60 });
+      }
 
-    chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextWork });
+      chrome.runtime.sendMessage({ type: 'TIMER_UPDATED', timerState: nextWork });
+
+      return newState;
+    });
   },
 
   stopTimer: async () => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       timerState: {
-        ...currentState.timerState,
+        ...initialState.timerState,
         isRunning: false,
         lastUpdated: Date.now(),
       },
     }));
     await pomodoroStorage.clearAlarm('pomodoroTimer');
-
     chrome.runtime.sendMessage({ type: 'STOP_TIMER' });
   },
 
   resetTimer: async () => {
     const settings = await pomodoroStorage.getSettings();
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       timerState: {
         time: settings.pomodoroDuration * 60,
@@ -300,162 +330,182 @@ export const pomodoroStorage: PomodoroStorage = {
   },
 
   setTime: async (time: number) => {
-    const currentState = await storage.get();
-    await storage.set(state => ({
-      ...state,
-      timerState: { ...state.timerState, time, lastUpdated: Date.now() },
-    }));
-    if (currentState.timerState.isRunning) {
-      await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: time / 60 });
-    }
-    chrome.runtime.sendMessage({ type: 'TIME_UPDATED', time });
+    await setPersistentState(async currentState => {
+      const newState = {
+        ...currentState,
+        timerState: { ...currentState.timerState, time, lastUpdated: Date.now() },
+      };
+      if (currentState.timerState.isRunning) {
+        await pomodoroStorage.createAlarm('pomodoroTimer', { delayInMinutes: time / 60 });
+      }
+      chrome.runtime.sendMessage({ type: 'TIME_UPDATED', time });
+      return newState;
+    });
   },
 
   updateTaskPriority: async (id: string, priority: Task['priority']) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: updateTaskInTree(currentState.tasks, id, { priority }),
     }));
   },
 
   deleteAllTasks: async () => {
-    await storage.set(currentState => ({ ...currentState, tasks: [] }));
+    await setPersistentState(currentState => ({
+      ...currentState,
+      tasks: [],
+    }));
   },
 
   toggleCollapseAll: async () => {
-    await storage.set(currentState => ({ ...currentState, allTasksCollapsed: !currentState.allTasksCollapsed }));
+    await setPersistentState(currentState => ({
+      ...currentState,
+      allTasksCollapsed: !currentState.allTasksCollapsed,
+    }));
   },
 
   setTasks: async (tasks: Task[]) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks,
     }));
   },
 
   addTask: async (text: string, priority: Task['priority']) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: [...currentState.tasks, { id: Date.now().toString(), text, completed: false, priority, children: [] }],
     }));
   },
+
   toggleTask: async (taskId: string) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: toggleTaskInTree(currentState.tasks, taskId),
     }));
   },
+
   updateTask: async (taskId: string, updates: Partial<Task>) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: updateTaskInTree(currentState.tasks, taskId, updates),
     }));
   },
+
   updateTaskTree: async (updateFn: (tasks: Task[]) => Task[]) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: updateFn(currentState.tasks),
     }));
   },
 
   addChildTask: async (parentId: string, text: string) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: addChildTaskInTree(currentState.tasks, parentId, text),
     }));
   },
 
   deleteTask: async (taskId: string) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       tasks: deleteTaskInTree(currentState.tasks, taskId),
     }));
   },
 
   toggleHideCompleted: async () => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       hideCompleted: !currentState.hideCompleted,
     }));
   },
+
   addBreakInterval: async (duration: number) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       breakIntervals: [...currentState.breakIntervals, { id: Date.now().toString(), duration }],
     }));
   },
+
   updateBreakInterval: async (id: string, duration: number) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       breakIntervals: currentState.breakIntervals.map(interval =>
         interval.id === id ? { ...interval, duration } : interval,
       ),
     }));
   },
+
   deleteBreakInterval: async (id: string) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       breakIntervals: currentState.breakIntervals.filter(interval => interval.id !== id),
     }));
   },
+
   addToTimerQueue: async (timerState: TimerState) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       timerQueue: [...currentState.timerQueue, timerState],
     }));
   },
+
   removeFromTimerQueue: async (index: number) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       timerQueue: currentState.timerQueue.filter((_, i) => i !== index),
     }));
   },
+
   setSettings: async (settings: Partial<Settings>) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       settings: { ...currentState.settings, ...settings },
     }));
   },
 
   getSettings: async () => {
-    const currentState = await storage.get();
+    const currentState = await getPersistentState();
     return currentState.settings;
   },
 
   updateTimerStateBasedOnSettings: async () => {
-    const currentState = await storage.get();
-    const { settings, timerState } = currentState;
+    await setPersistentState(currentState => {
+      const { settings, timerState } = currentState;
 
-    let newTime = timerState.time;
-    if (timerState.type === 'work' && timerState.time === currentState.settings.pomodoroDuration * 60) {
-      newTime = settings.pomodoroDuration * 60;
-    } else if (timerState.type === 'break') {
-      const isLongBreak =
-        currentState.breakIntervals.findIndex(interval => interval.duration === timerState.time) === -1;
-      if (isLongBreak && timerState.time === currentState.settings.longBreakDuration * 60) {
-        newTime = settings.longBreakDuration * 60;
-      } else if (!isLongBreak && timerState.time === currentState.settings.shortBreakDuration * 60) {
-        newTime = settings.shortBreakDuration * 60;
+      let newTime = timerState.time;
+      if (timerState.type === 'work' && timerState.time === currentState.settings.pomodoroDuration * 60) {
+        newTime = settings.pomodoroDuration * 60;
+      } else if (timerState.type === 'break') {
+        const isLongBreak =
+          currentState.breakIntervals.findIndex(interval => interval.duration === timerState.time) === -1;
+        if (isLongBreak && timerState.time === currentState.settings.longBreakDuration * 60) {
+          newTime = settings.longBreakDuration * 60;
+        } else if (!isLongBreak && timerState.time === currentState.settings.shortBreakDuration * 60) {
+          newTime = settings.shortBreakDuration * 60;
+        }
       }
-    }
 
-    if (newTime !== timerState.time) {
-      await storage.set(state => ({
-        ...state,
-        timerState: { ...state.timerState, time: newTime },
-      }));
-    }
+      if (newTime !== timerState.time) {
+        return {
+          ...currentState,
+          timerState: { ...timerState, time: newTime },
+        };
+      }
+
+      return currentState;
+    });
   },
 
   setExpandedTasks: async (expandedTasks: Record<string, boolean>) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       expandedTasks,
     }));
   },
 
   toggleTaskExpanded: async (taskId: string) => {
-    await storage.set(currentState => ({
+    await setPersistentState(currentState => ({
       ...currentState,
       expandedTasks: {
         ...currentState.expandedTasks,

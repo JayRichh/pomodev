@@ -204,16 +204,22 @@ function stopTimerCheck(): void {
 chrome.runtime.onStartup.addListener(async () => {
   try {
     const state = await pomodoroStorage.get();
-    if (!state || !state.timerState) {
-      throw new Error('Invalid state on startup');
-    }
 
     if (state.timerState.isRunning) {
       startTimerCheck();
-      const remainingTime = Math.max(0, state.timerState.time - (Date.now() - state.timerState.lastUpdated) / 1000);
+      const elapsed = Math.floor((Date.now() - state.timerState.lastUpdated) / 1000);
+      const remainingTime = Math.max(0, state.timerState.time - elapsed);
+
       if (remainingTime > 30) {
         await pomodoroStorage.createAlarm(ALARM_KEY, { delayInMinutes: remainingTime / 60 });
+      } else if (remainingTime > 0) {
+        // If less than 30 seconds remaining, don't create an alarm, just let the interval handle it
+        startTimerCheck();
+      } else {
+        // Timer should have ended while browser was closed
+        await handleTimerCompletion(state);
       }
+
       await updateBadge(remainingTime, state.timerState.time, state.timerState.type);
     } else {
       await updateBadge(state.timerState.time, state.timerState.time, 'paused');
