@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { useStorageSuspense } from '@extension/shared';
+import { useStorageSuspense, usePomodoroStorage } from '@extension/shared';
 import { exampleThemeStorage, Task } from '@extension/storage';
 import { FaPlus, FaTrash, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import '@src/Popup.css';
 import { SearchBar, SortAndFilterMenu, filterAndSortTasks, Priority, SortBy } from './TasksToolbar';
 import TaskItem from './TaskItem';
-import { usePomodoroStorage } from '@extension/shared';
 
 const TasksTab: React.FC = () => {
   const {

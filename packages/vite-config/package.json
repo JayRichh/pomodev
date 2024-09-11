@@ -1,6 +1,6 @@
 {
   "name": "@extension/vite-config",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "Vite base configuration",
   "main": "index.mjs",
   "type": "module",
@@ -12,3 +12,4 @@
     "deepmerge": "^4.3.1"
   }
 }
+

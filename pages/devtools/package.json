@@ -1,6 +1,6 @@
 {
   "name": "@extension/devtools",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "chrome extension devtools",
   "private": true,
   "sideEffects": true,

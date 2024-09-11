@@ -194,7 +194,7 @@ export const pomodoroStorage: PomodoroStorage = {
       const now = Date.now();
       const newIsRunning = !currentState.timerState.isRunning;
       let newTime = currentState.timerState.time;
-      let newQueue = [...currentState.timerQueue];
+      const newQueue = [...currentState.timerQueue];
       let newType = currentState.timerState.type;
 
       if (currentState.timerState.isRunning) {

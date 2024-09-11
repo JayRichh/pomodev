@@ -174,6 +174,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             await pomodoroStorage.clearAlarm(ALARM_KEY);
           }
           break;
+        case 'TIMER_UPDATED':
+          startTimerCheck();
+          await pomodoroStorage.createAlarm(ALARM_KEY, { delayInMinutes: message.timerState.time / 60 });
+          await updateBadge(message.timerState.time, message.timerState.time, message.timerState.type);
+          break;
         default:
           throw new Error(`Unknown message type: ${message.type}`);
       }

@@ -11,34 +11,54 @@ interface TimerQueueProps {
 }
 
 const TimerQueue: React.FC<TimerQueueProps> = ({ currentTimer, queue, onRemove, formatTime }) => {
-  const totalTime = [currentTimer, ...queue].reduce((acc, timer) => acc + timer.time, 0);
   const theme = useStorageSuspense(exampleThemeStorage);
   const isLight = theme === 'light';
+  const allTimers = [currentTimer, ...queue];
+  const totalTime = allTimers.reduce((acc, timer) => acc + timer.time, 0);
+
   return (
     <div className="mt-4">
       <h3 className={`text-lg font-semibold mb-2 ${isLight ? 'text-gray-800' : 'text-gray-100'}`}>Timer Queue</h3>
-      <ul className="space-y-2">
-        {[currentTimer, ...queue].map((timer, index) => (
+      <ul className="space-y-2 mb-4">
+        {allTimers.map((timer, index) => (
           <li key={index} className="flex justify-between items-center">
-            <span className={timer.type === 'work' ? 'text-blue-600' : 'text-green-600'}>
+            <span className={`${isLight ? 'text-gray-800' : 'text-gray-100'}`}>
               {timer.type === 'work' ? 'Work' : 'Break'}: {formatTime(timer.time)}
             </span>
             {index > 0 && (
-              <button onClick={() => onRemove(index - 1)} className="text-red-500 hover:text-red-700">
+              <button
+                onClick={() => onRemove(index - 1)}
+                className={`${isLight ? 'text-gray-600 hover:text-gray-800' : 'text-gray-300 hover:text-white'} transition-colors duration-200`}>
                 Remove
               </button>
             )}
           </li>
         ))}
       </ul>
-      <div className={`h-2 w-full mt-2 rounded-full overflow-hidden ${isLight ? 'bg-gray-200' : 'bg-gray-600'}`}>
-        {[currentTimer, ...queue].map((timer, index) => (
-          <div
-            key={index}
-            className={`h-full ${timer.type === 'work' ? 'bg-blue-500' : 'bg-green-500'}`}
-            style={{ width: `${(timer.time / totalTime) * 100}%`, float: 'left' }}
-          />
-        ))}
+      <div className={`h-2 w-full ${isLight ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
+        <div className="h-full w-full flex">
+          {allTimers.map((timer, index) => (
+            <div
+              key={index}
+              className={`${
+                timer.type === 'work'
+                  ? isLight
+                    ? 'bg-blue-400'
+                    : 'bg-blue-500'
+                  : timer.type === 'break'
+                    ? isLight
+                      ? 'bg-green-400'
+                      : 'bg-green-500'
+                    : isLight
+                      ? 'bg-red-400'
+                      : 'bg-red-500'
+              }`}
+              style={{
+                width: `${(timer.time / totalTime) * 100}%`,
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

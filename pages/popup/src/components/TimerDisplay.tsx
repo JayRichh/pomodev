@@ -5,14 +5,23 @@ import { exampleThemeStorage } from '@extension/storage';
 interface TimerDisplayProps {
   time: number;
   type: 'work' | 'break';
-  totalWorkTime: number;
+  elapsedWorkTime: number;
+  elapsedBreakTime: number;
   onTimeEdit: (newTime: number) => void;
   formatTime: (seconds: number) => string;
 }
 
-const TimerDisplay: React.FC<TimerDisplayProps> = ({ time, type, totalWorkTime, onTimeEdit, formatTime }) => {
+const TimerDisplay: React.FC<TimerDisplayProps> = ({
+  time,
+  type,
+  elapsedWorkTime,
+  elapsedBreakTime,
+  onTimeEdit,
+  formatTime,
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const theme = useStorageSuspense(exampleThemeStorage);
+  const isLight = theme === 'light';
 
   const handleTimeEdit = (e: React.FocusEvent<HTMLInputElement>) => {
     const [minutes, seconds] = e.target.value.split(':').map(Number);
@@ -23,28 +32,41 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ time, type, totalWorkTime, 
   };
 
   return (
-    <div className={`p-4 text-center ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+    <div className="text-center py-4">
       {isEditing ? (
         <input
           type="text"
           defaultValue={formatTime(time)}
           onBlur={handleTimeEdit}
-          className={`text-6xl font-bold w-full text-center bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            theme === 'light' ? 'text-gray-800' : 'text-white'
+          className={`text-5xl font-bold w-full text-center bg-transparent focus:outline-none ${
+            isLight ? 'text-foreground' : 'dark:text-foreground'
           }`}
           autoFocus
         />
       ) : (
         <h2
-          className={`text-6xl font-bold cursor-pointer ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}
+          className={`text-5xl font-bold cursor-pointer ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}
           onClick={() => setIsEditing(true)}>
           {formatTime(time)}
         </h2>
       )}
-      <p className={`text-xl mt-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>{type}</p>
-      <p className={`text-sm mt-1 ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>
-        Total work time: {formatTime(totalWorkTime)}
+      <p className={`text-lg mt-1 ${isLight ? 'text-muted-foreground' : 'dark:text-muted-foreground'}`}>
+        {type.charAt(0).toUpperCase() + type.slice(1)}
       </p>
+      <div className="flex justify-between mt-2 text-sm">
+        <div>
+          <p className={isLight ? 'text-muted-foreground' : 'dark:text-muted-foreground'}>Total work time</p>
+          <p className={`font-semibold ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}>
+            {formatTime(elapsedWorkTime)}
+          </p>
+        </div>
+        <div>
+          <p className={isLight ? 'text-muted-foreground' : 'dark:text-muted-foreground'}>Total break time</p>
+          <p className={`font-semibold ${isLight ? 'text-foreground' : 'dark:text-foreground'}`}>
+            {formatTime(elapsedBreakTime)}
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

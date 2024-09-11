@@ -1,6 +1,6 @@
 {
   "name": "@extension/new-tab",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "description": "chrome extension new tab",
   "private": true,
   "sideEffects": true,
