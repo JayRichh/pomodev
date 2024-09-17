@@ -45,6 +45,8 @@ export interface PomodoroState {
   filterPriority: Priority | 'all';
   sortBy: SortBy;
   searchText: string;
+  elapsedWorkTime: number;
+  elapsedBreakTime: number;
 }
 
 type PomodoroStorage = BaseStorage<PomodoroState> & {
@@ -152,6 +154,8 @@ const initialState: PomodoroState = {
   filterPriority: 'all',
   sortBy: { field: 'createdAt', order: 'asc' },
   searchText: '',
+  elapsedWorkTime: 0,
+  elapsedBreakTime: 0,
 };
 
 const storage = createStorage<PomodoroState>('pomodoro-storage-key', initialState, {
@@ -192,16 +196,28 @@ export const pomodoroStorage: PomodoroStorage = {
   toggleTimer: async () => {
     await setPersistentState(async currentState => {
       const now = Date.now();
+      const wasRunning = currentState.timerState.isRunning;
       const newIsRunning = !currentState.timerState.isRunning;
       let newTime = currentState.timerState.time;
       const newQueue = [...currentState.timerQueue];
       let newType = currentState.timerState.type;
+      let newElapsedWorkTime = currentState.elapsedWorkTime;
+      let newElapsedBreakTime = currentState.elapsedBreakTime;
 
-      if (currentState.timerState.isRunning) {
+      if (wasRunning) {
+        // Timer was running and will be paused
         const elapsed = Math.floor((now - currentState.timerState.lastUpdated) / 1000);
         newTime = Math.max(0, currentState.timerState.time - elapsed);
+
+        // Update elapsed time
+        if (currentState.timerState.type === 'work') {
+          newElapsedWorkTime += elapsed;
+        } else if (currentState.timerState.type === 'break') {
+          newElapsedBreakTime += elapsed;
+        }
       }
 
+      // Handle timer reaching zero and moving to next timer
       if (newTime === 0 && newQueue.length > 0) {
         const nextTimer = newQueue.shift();
         if (nextTimer) {
@@ -220,6 +236,8 @@ export const pomodoroStorage: PomodoroStorage = {
           type: newType,
         },
         timerQueue: newQueue,
+        elapsedWorkTime: newElapsedWorkTime,
+        elapsedBreakTime: newElapsedBreakTime,
       };
 
       if (newIsRunning) {
@@ -249,6 +267,9 @@ export const pomodoroStorage: PomodoroStorage = {
         return currentState;
       }
 
+      const elapsed = Math.floor((Date.now() - currentState.timerState.lastUpdated) / 1000);
+      const newElapsedWorkTime = currentState.elapsedWorkTime + elapsed;
+
       const newState = {
         ...currentState,
         timerState: {
@@ -257,6 +278,7 @@ export const pomodoroStorage: PomodoroStorage = {
           lastUpdated: Date.now(),
         },
         timerQueue: currentState.timerQueue.filter(timer => timer !== nextBreak),
+        elapsedWorkTime: newElapsedWorkTime,
       };
 
       if (currentState.timerState.isRunning) {
@@ -280,6 +302,9 @@ export const pomodoroStorage: PomodoroStorage = {
         return currentState;
       }
 
+      const elapsed = Math.floor((Date.now() - currentState.timerState.lastUpdated) / 1000);
+      const newElapsedBreakTime = currentState.elapsedBreakTime + elapsed;
+
       const newState = {
         ...currentState,
         timerState: {
@@ -288,6 +313,7 @@ export const pomodoroStorage: PomodoroStorage = {
           lastUpdated: Date.now(),
         },
         timerQueue: currentState.timerQueue.filter(timer => timer !== nextWork),
+        elapsedBreakTime: newElapsedBreakTime,
       };
 
       if (currentState.timerState.isRunning) {
@@ -301,14 +327,28 @@ export const pomodoroStorage: PomodoroStorage = {
   },
 
   stopTimer: async () => {
-    await setPersistentState(currentState => ({
-      ...currentState,
-      timerState: {
-        ...initialState.timerState,
-        isRunning: false,
-        lastUpdated: Date.now(),
-      },
-    }));
+    await setPersistentState(currentState => {
+      const elapsed = Math.floor((Date.now() - currentState.timerState.lastUpdated) / 1000);
+      let newElapsedWorkTime = currentState.elapsedWorkTime;
+      let newElapsedBreakTime = currentState.elapsedBreakTime;
+
+      if (currentState.timerState.type === 'work') {
+        newElapsedWorkTime += elapsed;
+      } else if (currentState.timerState.type === 'break') {
+        newElapsedBreakTime += elapsed;
+      }
+
+      return {
+        ...currentState,
+        timerState: {
+          ...initialState.timerState,
+          isRunning: false,
+          lastUpdated: Date.now(),
+        },
+        elapsedWorkTime: newElapsedWorkTime,
+        elapsedBreakTime: newElapsedBreakTime,
+      };
+    });
     await pomodoroStorage.clearAlarm('pomodoroTimer');
     chrome.runtime.sendMessage({ type: 'STOP_TIMER' });
   },
@@ -324,6 +364,8 @@ export const pomodoroStorage: PomodoroStorage = {
         type: 'work',
       },
       timerQueue: [],
+      elapsedWorkTime: 0,
+      elapsedBreakTime: 0,
     }));
     await pomodoroStorage.clearAlarm('pomodoroTimer');
     chrome.runtime.sendMessage({ type: 'RESET_TIMER' });
@@ -342,7 +384,6 @@ export const pomodoroStorage: PomodoroStorage = {
       return newState;
     });
   },
-
   updateTaskPriority: async (id: string, priority: Task['priority']) => {
     await setPersistentState(currentState => ({
       ...currentState,

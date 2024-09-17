@@ -18,6 +18,10 @@ type PomodoroStorageHook = PomodoroState &
     setSortBy: (sortBy: SortBy) => void;
     searchText: string;
     setSearchText: (text: string) => void;
+    getElapsedWorkTime: () => number;
+    setElapsedWorkTime: (time: number) => void;
+    getElapsedBreakTime: () => number;
+    setElapsedBreakTime: (time: number) => void;
   };
 
 export function usePomodoroStorage(): PomodoroStorageHook {
@@ -38,6 +42,8 @@ export function usePomodoroStorage(): PomodoroStorageHook {
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>(state.filterPriority);
   const [sortBy, setSortBy] = useState<SortBy>(state.sortBy || { field: 'createdAt', order: 'asc' });
   const [searchText, setSearchText] = useState<string>(state.searchText);
+  const [elapsedWorkTime, setElapsedWorkTime] = useState<number>(state.elapsedWorkTime);
+  const [elapsedBreakTime, setElapsedBreakTime] = useState<number>(state.elapsedBreakTime);
 
   useEffect(() => {
     const unsubscribe = pomodoroStorage.subscribe(() => {
@@ -56,6 +62,8 @@ export function usePomodoroStorage(): PomodoroStorageHook {
         setFilterPriority(newState.filterPriority);
         setSortBy(newState.sortBy);
         setSearchText(newState.searchText);
+        setElapsedWorkTime(newState.elapsedWorkTime);
+        setElapsedBreakTime(newState.elapsedBreakTime);
       }
     });
     return unsubscribe;
@@ -75,6 +83,8 @@ export function usePomodoroStorage(): PomodoroStorageHook {
       filterPriority,
       sortBy,
       searchText,
+      elapsedWorkTime,
+      elapsedBreakTime,
     });
   }, [
     timerState,
@@ -89,7 +99,12 @@ export function usePomodoroStorage(): PomodoroStorageHook {
     filterPriority,
     sortBy,
     searchText,
+    elapsedWorkTime,
+    elapsedBreakTime,
   ]);
+
+  const getElapsedWorkTime = () => elapsedWorkTime;
+  const getElapsedBreakTime = () => elapsedBreakTime;
 
   return {
     ...state,
@@ -109,6 +124,10 @@ export function usePomodoroStorage(): PomodoroStorageHook {
     setSortBy,
     searchText,
     setSearchText,
+    getElapsedWorkTime,
+    setElapsedWorkTime,
+    getElapsedBreakTime,
+    setElapsedBreakTime,
   };
 }
 
@@ -131,6 +150,8 @@ function getInitialState(): PomodoroState {
     filterPriority: 'all',
     sortBy: { field: 'createdAt', order: 'asc' },
     searchText: '',
+    elapsedWorkTime: 0,
+    elapsedBreakTime: 0,
   };
 }
 
